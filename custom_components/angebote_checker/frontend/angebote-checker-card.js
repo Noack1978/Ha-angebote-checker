@@ -878,6 +878,9 @@ class AngeboteCheckerCard extends HTMLElement {
         { entity_id: targetListId },
         false, false
       );
+      // Update offer.item so subsequent actions (e.g. move) use the new name
+      offer.item = newName;
+
       btn.classList.add("success");
       btn.innerHTML = `&#x2713; Umbenannt`;
       setTimeout(() => {
