@@ -120,7 +120,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(f"Fehler beim Abruf der Angebote: {err}") from err
 
         _LOGGER.info("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
-        return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso}
+        return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
     async def async_refresh_now(self) -> None:
         """Trigger an immediate data refresh."""
