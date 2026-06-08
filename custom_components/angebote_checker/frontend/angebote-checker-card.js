@@ -217,10 +217,15 @@ const CARD_STYLES = `
     position: relative;
     max-width: min(92vw, 560px);
     max-height: 90vh;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
+    padding: 16px 12px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
     animation: lb-scale 0.2s cubic-bezier(0.34,1.56,0.64,1);
   }
   @keyframes lb-scale { from { transform: scale(0.8); } to { transform: scale(1); } }
@@ -301,8 +306,13 @@ const CARD_STYLES = `
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 220px;
-    max-width: 320px;
+    min-width: min(220px, 80vw);
+    max-width: min(320px, 90vw);
+    max-height: 40vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+    width: 100%;
   }
   .list-picker-title {
     color: var(--ac-subtext, #9090b0);
@@ -821,20 +831,51 @@ class AngeboteCheckerCard extends HTMLElement {
     const stateObj = this._hass.states[this._config.entity];
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
-    let found = false;
+    // First find which list actually contains this item by reading items
+    let targetListId = null;
     for (const listId of allLists) {
       try {
-        await this._hass.callService("todo", "update_item", {
+        const result = await this._hass.callService("todo", "get_items", {
           entity_id: listId,
+          status: "needs_action",
+        }, { return_response: true });
+        const items = result?.[listId]?.items ?? [];
+        const match = items.find(i =>
+          (i.summary ?? i.name ?? "").toLowerCase() === offer.item.toLowerCase()
+        );
+        if (match) {
+          targetListId = listId;
+          break;
+        }
+      } catch (_) { /* continue */ }
+    }
+
+    if (!targetListId) {
+      // Fallback: try update on all lists without pre-check
+      for (const listId of allLists) {
+        try {
+          await this._hass.callService("todo", "update_item", {
+            entity_id: listId,
+            item: offer.item,
+            rename: newName,
+          });
+          targetListId = listId;
+          break;
+        } catch (_) { /* continue */ }
+      }
+    } else {
+      try {
+        await this._hass.callService("todo", "update_item", {
+          entity_id: targetListId,
           item: offer.item,
           rename: newName,
         });
-        found = true;
-        break;
-      } catch (_) { /* item may not be on this list, try next */ }
+      } catch (err) {
+        targetListId = null;
+      }
     }
 
-    if (found) {
+    if (targetListId) {
       btn.classList.add("success");
       btn.innerHTML = `&#x2713; Umbenannt`;
       setTimeout(() => {
@@ -843,7 +884,7 @@ class AngeboteCheckerCard extends HTMLElement {
       }, 2500);
     } else {
       btn.classList.add("error");
-      btn.innerHTML = `&#x2715; Fehler`;
+      btn.innerHTML = `&#x2715; Nicht gefunden`;
       setTimeout(() => {
         btn.classList.remove("error");
         btn.innerHTML = `&#x270F; Artikel ergänzen`;
@@ -901,7 +942,7 @@ class AngeboteCheckerCard extends HTMLElement {
         try {
           await this._hass.callService("todo", "remove_item", {
             entity_id: listId,
-            item: offer.item,
+            item: [offer.item],
           });
         } catch (_) { /* item may not be on this list */ }
       }
