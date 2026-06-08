@@ -1,0 +1,12 @@
+{
+  "domain": "angebote_checker",
+  "name": "Angebote Checker",
+  "codeowners": ["@Noack1978"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http"],
+  "documentation": "https://github.com/Noack1978/ha-angebote-checker",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Noack1978/ha-angebote-checker/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Angebote Checker einrichten",
+        "description": "Verbinde deine Einkaufslisten mit dem Marktguru-Angebotsdienst.",
+        "data": {
+          "name": "Name dieser Instanz",
+          "zip_code": "Postleitzahl (z. B. 12345)",
+          "todo_lists": "Einkaufslisten (mehrere wählbar)",
+          "retailers": "Händler prüfen (leer = alle)",
+          "scan_interval": "Aktualisierungsintervall (Minuten)"
+        }
+      }
+    },
+    "error": {
+      "invalid_zip": "Ungültige Postleitzahl – bitte 5-stellige PLZ eingeben.",
+      "api_error": "Fehler bei der Verbindung zur Marktguru-API."
+    },
+    "abort": {
+      "no_lists": "Keine Einkaufslisten gefunden. Bitte zuerst eine Todo-Liste anlegen.",
+      "already_configured": "Diese Instanz ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Angebote Checker – Einstellungen",
+        "data": {
+          "zip_code": "Postleitzahl",
+          "todo_lists": "Einkaufslisten",
+          "retailers": "Händler prüfen (leer = alle)",
+          "scan_interval": "Aktualisierungsintervall (Minuten)"
+        }
+      }
+    }
+  }
+}
