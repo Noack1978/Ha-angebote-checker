@@ -25,14 +25,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def _get_todo_items(hass: HomeAssistant, list_entity_id: str) -> list[str]:
-    """Return summary strings of all incomplete items in a todo list.
+    """Return summary strings of all incomplete items in a todo list."""
 
-    Tries the todo.get_items service first (requires todo platform to be ready).
-    Falls back to reading the entity's extra_state_attributes if the service
-    is not yet available (e.g. during early startup).
-    """
-    # Primary: use the service (most complete, includes status filter)
+    # Primary: service call
     if hass.services.has_service("todo", "get_items"):
+        _LOGGER.debug("AC: Lese Liste '%s' via Service", list_entity_id)
         try:
             result = await hass.services.async_call(
                 "todo",
@@ -41,35 +38,34 @@ async def _get_todo_items(hass: HomeAssistant, list_entity_id: str) -> list[str]
                 blocking=True,
                 return_response=True,
             )
+            _LOGGER.debug("AC: Service-Ergebnis für '%s': %s", list_entity_id, result)
             items = result.get(list_entity_id, {}).get("items", [])
-            return [
-                item.get("summary", "").strip()
-                for item in items
-                if item.get("summary")
-            ]
+            names = [item.get("summary", "").strip() for item in items if item.get("summary")]
+            _LOGGER.info("AC: Liste '%s' → %d Artikel: %s", list_entity_id, len(names), names)
+            return names
         except Exception as err:  # noqa: BLE001
-            _LOGGER.debug(
-                "todo.get_items fehlgeschlagen für '%s', versuche Fallback: %s",
-                list_entity_id, err,
-            )
+            _LOGGER.warning("AC: Service fehlgeschlagen für '%s': %s", list_entity_id, err)
 
-    # Fallback: read items from entity state attributes
+    # Fallback: state attributes
+    _LOGGER.debug("AC: Fallback – lese Attribute von '%s'", list_entity_id)
     state = hass.states.get(list_entity_id)
     if state is None:
-        _LOGGER.debug("Todo-Entität '%s' nicht gefunden.", list_entity_id)
+        _LOGGER.warning("AC: Entität '%s' nicht gefunden!", list_entity_id)
         return []
 
-    items = state.attributes.get("items", [])
-    if not items:
-        # Some todo integrations store items differently; try 'todo_items'
-        items = state.attributes.get("todo_items", [])
+    _LOGGER.debug("AC: State von '%s': %s | Attribute-Keys: %s",
+                  list_entity_id, state.state, list(state.attributes.keys()))
 
-    return [
+    items = state.attributes.get("items", state.attributes.get("todo_items", []))
+    names = [
         item.get("summary", item.get("name", "")).strip()
         for item in items
-        if isinstance(item, dict) and item.get("status", "needs_action") == "needs_action"
+        if isinstance(item, dict)
+        and item.get("status", "needs_action") == "needs_action"
         and (item.get("summary") or item.get("name"))
     ]
+    _LOGGER.info("AC: Liste '%s' (Fallback) → %d Artikel: %s", list_entity_id, len(names), names)
+    return names
 
 
 class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -81,6 +77,11 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._retailers: list[str] = config_data.get(CONF_RETAILERS, [])
         interval_minutes: int = config_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
+        _LOGGER.info(
+            "AC: Coordinator init – PLZ=%s, Listen=%s, Händler=%s, Intervall=%d min",
+            self._zip_code, self._todo_lists, self._retailers, interval_minutes,
+        )
+
         super().__init__(
             hass,
             _LOGGER,
@@ -89,32 +90,36 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch fresh offer data. Called automatically by the coordinator."""
-        session = async_get_clientsession(self.hass)
-        api = MarktguruAPI(session, self._zip_code)
+        """Fetch fresh offer data."""
+        _LOGGER.info("AC: Starte Aktualisierung – Listen: %s", self._todo_lists)
 
         all_items: list[str] = []
         for list_id in self._todo_lists:
-            all_items.extend(await _get_todo_items(self.hass, list_id))
+            items = await _get_todo_items(self.hass, list_id)
+            all_items.extend(items)
 
-        # Deduplicate while preserving insertion order
         seen: set[str] = set()
         unique_items = [x for x in all_items if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
 
         now_iso = datetime.now(UTC).isoformat()
+        _LOGGER.info("AC: Eindeutige Artikel gesamt: %d → %s", len(unique_items), unique_items)
 
         if not unique_items:
-            _LOGGER.debug("Keine Listeneinträge gefunden – keine API-Abfrage.")
+            _LOGGER.warning("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
             return {ATTR_OFFERS: [], ATTR_LAST_UPDATE: now_iso}
 
         retailer_filter = self._retailers if self._retailers else None
+        _LOGGER.info("AC: Händlerfilter: %s", retailer_filter)
+
+        session = async_get_clientsession(self.hass)
+        api = MarktguruAPI(session, self._zip_code)
 
         try:
             offers = await api.search_multiple(unique_items, retailer_filter)
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abruf der Angebote: {err}") from err
 
-        _LOGGER.debug("Angebote gefunden: %d für %d Artikel", len(offers), len(unique_items))
+        _LOGGER.info("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
         return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso}
 
     async def async_refresh_now(self) -> None:
