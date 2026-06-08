@@ -636,6 +636,16 @@ class AngeboteCheckerCard extends HTMLElement {
       btn.classList.remove("spinning");
     }, 1500);
   }
+
+  static getConfigElement() {
+    return document.createElement(EDITOR_NAME);
+  }
+
+  static getStubConfig(hass) {
+    const entity = Object.keys(hass.states)
+      .find(e => e.startsWith("sensor.angebote_checker")) ?? "";
+    return { entity, title: "Angebote", max_height: 500, show_images: true, default_view: "grid" };
+  }
 }
 
 /* ─── Visual Editor ──────────────────────────────────────────────────────── */
@@ -790,15 +800,7 @@ class AngeboteCheckerCardEditor extends HTMLElement {
 customElements.define(EDITOR_NAME, AngeboteCheckerCardEditor);
 
 customElements.define(CARD_NAME, AngeboteCheckerCard);
-AngeboteCheckerCard.prototype.getConfigElement = function () {
-  return document.createElement(EDITOR_NAME);
-};
-AngeboteCheckerCard.prototype.getStubConfig = function (hass) {
-  /* Pre-fill with first matching sensor */
-  const entity = Object.keys(hass.states)
-    .find(e => e.startsWith("sensor.angebote_checker")) ?? "";
-  return { entity, title: "Angebote", max_height: 500, show_images: true, default_view: "grid" };
-};
+
 
 /* ─── Register in HACS / Lovelace custom card registry ────────────────── */
 
