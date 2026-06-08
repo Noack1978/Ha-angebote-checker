@@ -538,7 +538,7 @@ class AngeboteCheckerCard extends HTMLElement {
       box.innerHTML = ICON_EMPTY;
       box.append(
         el("p", {}, "Keine Angebote gefunden"),
-        el("p", { class: "hint" }, "Klicke auf „Suchen" für eine neue Abfrage."),
+        el("p", { class: "hint" }, "Klicke auf 'Suchen' für eine neue Abfrage."),
       );
       this._contentEl.append(box);
       return;
