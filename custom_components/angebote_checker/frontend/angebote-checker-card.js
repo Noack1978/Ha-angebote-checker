@@ -826,20 +826,29 @@ class AngeboteCheckerCard extends HTMLElement {
   }
 
   /** Rename the todo item to include price/retailer info */
-  /** Find which list contains this item by reading hass.states attributes.
-   *  Returns the entity_id of the first list that has the item, or null.
+  /** Find which list contains this item via todo.get_items service.
+   *  Uses correct callService signature:
+   *  callService(domain, service, data, target, notifyOnError=false, returnResponse=true)
+   *  Response is at result.response[entity_id].items
+   *  Returns the entity_id of the first matching list, or null.
    */
-  _findItemInLists(itemName, listIds) {
+  async _findItemInLists(itemName, listIds) {
     const needle = itemName.toLowerCase().trim();
     for (const listId of listIds) {
-      const state = this._hass.states[listId];
-      if (!state) continue;
-      const items = state.attributes?.items ?? [];
-      const found = items.some(i => {
-        const summary = (i.summary ?? i.name ?? "").toLowerCase().trim();
-        return summary === needle;
-      });
-      if (found) return listId;
+      try {
+        const result = await this._hass.callService(
+          "todo", "get_items",
+          { status: "needs_action" },
+          { entity_id: listId },
+          false,  // notifyOnError
+          true    // returnResponse
+        );
+        const items = result?.response?.[listId]?.items ?? [];
+        const found = items.some(i =>
+          (i.summary ?? i.name ?? "").toLowerCase().trim() === needle
+        );
+        if (found) return listId;
+      } catch (_) { /* list not accessible, try next */ }
     }
     return null;
   }
@@ -850,7 +859,7 @@ class AngeboteCheckerCard extends HTMLElement {
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
     // Find which list has this item via state attributes (no service call needed)
-    const targetListId = this._findItemInLists(offer.item, allLists);
+    const targetListId = await this._findItemInLists(offer.item, allLists);
 
     if (!targetListId) {
       btn.classList.add("error");
@@ -863,11 +872,12 @@ class AngeboteCheckerCard extends HTMLElement {
     }
 
     try {
-      await this._hass.callService("todo", "update_item", {
-        entity_id: targetListId,
-        item: offer.item,
-        rename: newName,
-      });
+      await this._hass.callService(
+        "todo", "update_item",
+        { item: offer.item, rename: newName },
+        { entity_id: targetListId },
+        false, false
+      );
       btn.classList.add("success");
       btn.innerHTML = `&#x2713; Umbenannt`;
       setTimeout(() => {
@@ -923,14 +933,16 @@ class AngeboteCheckerCard extends HTMLElement {
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
     // Find the exact list that currently holds the item
-    const sourceListId = this._findItemInLists(offer.item, allLists);
+    const sourceListId = await this._findItemInLists(offer.item, allLists);
 
     try {
       // Add to target list
-      await this._hass.callService("todo", "add_item", {
-        entity_id: targetListId,
-        item: offer.item,
-      });
+      await this._hass.callService(
+        "todo", "add_item",
+        { item: offer.item },
+        { entity_id: targetListId },
+        false, false
+      );
 
       // Remove from source list (only the list that actually has it)
       if (sourceListId && sourceListId !== targetListId) {
