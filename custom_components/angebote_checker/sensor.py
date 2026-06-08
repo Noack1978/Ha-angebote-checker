@@ -72,4 +72,5 @@ class AngeboteCheckerSensor(CoordinatorEntity[AngeboteCheckerCoordinator], Senso
         return {
             ATTR_OFFERS: self.coordinator.data.get(ATTR_OFFERS, []),
             ATTR_LAST_UPDATE: self.coordinator.data.get(ATTR_LAST_UPDATE, ""),
+            "todo_lists": self.coordinator.data.get("todo_lists", []),
         }

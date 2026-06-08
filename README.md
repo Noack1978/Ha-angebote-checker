@@ -10,6 +10,10 @@ Eine HACS-kompatible Custom Integration, die deine HA-Einkaufslisten (Todo-Entit
 - 📅 Zeigt Angebotszeitraum (von–bis) je Händler an
 - 🔄 Automatische Aktualisierung (konfigurierbares Intervall, min. 5 Minuten)
 - ▶️ Manuelle Suche per Service-Button im Dashboard
+- 🖼️ Custom Lovelace-Karte mit Kachel- und Listenansicht, Händler-Filter-Chips und Produktbildern
+- 🔍 Lightbox: Produktbild per Klick vergrößern
+- ✏️ Artikel direkt aus der Karte mit Angebotsinformationen ergänzen (z. B. `Butter → Butter (Lidl 0,99 €)`)
+- ➡️ Artikel aus der Lightbox heraus auf eine andere Einkaufsliste verschieben
 - ✅ Vollständiger Config Flow – keine `configuration.yaml`-Änderungen nötig
 
 ## Installation
@@ -43,30 +47,27 @@ Den Ordner `custom_components/angebote_checker/` in dein HA-Konfigurationsverzei
 
 ## Dashboard-Karte
 
-```yaml
-type: markdown
-title: 🏷️ Angebote meiner Einkaufsliste
-content: >
-  {% set sensor = states.sensor | selectattr('entity_id', 'match', 'sensor.angebote_checker.*') | list %}
-  {% if sensor | length == 0 %}
-  _Kein Angebote-Checker-Sensor gefunden._
-  {% else %}
-  {% set offers = sensor[0].attributes.offers | default([]) %}
-  {% set last = sensor[0].attributes.last_update | default('') %}
-  {% if offers | length == 0 %}
-  **Keine passenden Angebote gefunden.**
-  Stand: {{ last[:10] if last else '–' }}
-  {% else %}
-  Stand: {{ last[:10] if last else '–' }} · {{ offers | length }} Treffer
+Die Integration bringt eine eigene Lovelace-Karte mit, die nach der Installation automatisch im Dashboard-Editor unter **„Angebote Checker"** auswählbar ist.
 
-  | Artikel | Preis | Händler | Angebot |
-  |---------|-------|---------|---------|
-  {% for o in offers %}
-  | {{ o.item }} | **{{ o.price }}** | {{ o.retailer }} | {{ o.valid_from }}–{{ o.valid_to }} |
-  {% endfor %}
-  {% endif %}
-  {% endif %}
+```yaml
+type: custom:angebote-checker-card
+entity: sensor.angebote_checker_angebote_checker
+title: Angebote
+max_height: 500
+show_images: true
+default_view: grid
 ```
+
+### Karten-Funktionen
+
+| Funktion | Beschreibung |
+|---|---|
+| Kachel-/Listenansicht | Umschalten über die Buttons oben rechts |
+| Händler-Filter | Chips oberhalb der Angebote – Klick filtert nach Händler |
+| Suchen-Button | Löst sofort eine neue API-Abfrage aus |
+| Bild vergrößern | Klick auf ein Produktbild öffnet die Lightbox |
+| Artikel ergänzen | In der Lightbox: benennt den Todo-Eintrag um (fügt Händler + Preis hinzu) |
+| Liste verschieben | In der Lightbox: verschiebt den Artikel auf eine andere Todo-Liste |
 
 ## Service
 
@@ -75,6 +76,22 @@ service: angebote_checker.refresh
 ```
 
 Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
+
+## Changelog
+
+### v1.1.0
+- 🔍 Lightbox: Produktbild per Klick vergrößerbar
+- ✏️ Artikel aus der Lightbox heraus mit Angebotsinformationen ergänzen
+- ➡️ Artikel direkt in der Karte auf eine andere Einkaufsliste verschieben
+- 🐛 Fix: Datumsparser für `validityDates`-API-Struktur korrigiert
+- 🐛 Fix: Syntaxfehler in JS-Karte behoben
+- 🐛 Fix: `todo.get_items`-Service-Verfügbarkeit wird jetzt vor Aufruf geprüft
+
+### v1.0.0
+- Erstveröffentlichung
+- Custom Lovelace-Karte mit Kachel- und Listenansicht
+- Händler-Filter, automatische Lovelace-Ressourcen-Registrierung
+- Marktguru-API-Anbindung mit regionaler PLZ-Suche
 
 ## Bekannte Einschränkungen
 

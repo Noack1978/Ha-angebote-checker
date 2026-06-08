@@ -3,7 +3,7 @@
  * Custom Lovelace card for the Angebote Checker integration.
  * Displays supermarket offers found for shopping list items.
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @author  Noack1978
  */
 
@@ -11,7 +11,7 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
 
@@ -196,6 +196,136 @@ const CARD_STYLES = `
     padding: 2px 6px;
     backdrop-filter: blur(4px);
   }
+
+  /* clickable image cursor */
+  .offer-img-wrap.has-image { cursor: zoom-in; }
+
+  /* ── Lightbox ── */
+  .lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    animation: lb-in 0.18s ease;
+  }
+  @keyframes lb-in { from { opacity: 0; } to { opacity: 1; } }
+  .lightbox-inner {
+    position: relative;
+    max-width: min(92vw, 560px);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    animation: lb-scale 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes lb-scale { from { transform: scale(0.8); } to { transform: scale(1); } }
+  .lightbox-img {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    background: #111;
+    padding: 12px;
+  }
+  .lightbox-caption {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+  .lightbox-sub {
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+    margin-top: 2px;
+    text-align: center;
+  }
+  .lightbox-close {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    background: var(--ac-accent2);
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    line-height: 30px;
+    text-align: center;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: transform 0.15s;
+  }
+  .lightbox-close:hover { transform: scale(1.15); }
+
+  /* ── Lightbox action buttons ── */
+  .lightbox-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+  .lb-btn {
+    background: var(--ac-surface, #25253a);
+    border: 1px solid var(--ac-border, rgba(255,255,255,0.12));
+    border-radius: 8px;
+    color: var(--ac-text, #e8e8f0);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 14px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lb-btn:hover { background: var(--ac-accent, #6c63ff); color: #fff; border-color: var(--ac-accent, #6c63ff); }
+  .lb-btn.success { background: #4ade80; color: #0a2a10; border-color: #4ade80; }
+  .lb-btn.error   { background: #ff6b6b; color: #fff; border-color: #ff6b6b; }
+
+  /* ── List picker sheet ── */
+  .list-picker {
+    background: var(--ac-surface, #25253a);
+    border: 1px solid var(--ac-border, rgba(255,255,255,0.12));
+    border-radius: 12px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 220px;
+    max-width: 320px;
+  }
+  .list-picker-title {
+    color: var(--ac-subtext, #9090b0);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 6px 4px;
+    border-bottom: 1px solid var(--ac-border, rgba(255,255,255,0.08));
+    margin-bottom: 2px;
+  }
+  .list-picker-item {
+    background: none;
+    border: none;
+    border-radius: 7px;
+    color: var(--ac-text, #e8e8f0);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 10px;
+    text-align: left;
+    transition: background 0.12s;
+  }
+  .list-picker-item:hover { background: var(--ac-accent, #6c63ff); color: #fff; }
 
   .offer-body {
     padding: 9px 10px 10px;
@@ -561,8 +691,12 @@ class AngeboteCheckerCard extends HTMLElement {
     /* Image area */
     const imgWrap = el("div", { class: "offer-img-wrap" });
     if (this._config.show_images && offer.image_url) {
+      imgWrap.classList.add("has-image");
+      imgWrap.onclick = () => this._openLightbox(offer);
       const img = el("img", { class: "offer-img", src: offer.image_url, alt: offer.description });
       img.onerror = () => {
+        imgWrap.classList.remove("has-image");
+        imgWrap.onclick = null;
         imgWrap.innerHTML = "";
         const ph = document.createElement("div");
         ph.innerHTML = `<svg class="offer-img-placeholder" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6l3.5-4.5 2.5 3.01L15 12l4 7z"/></svg>`;
@@ -619,6 +753,202 @@ class AngeboteCheckerCard extends HTMLElement {
       el("span", {}, `Stand: ${ts}`),
       el("span", {}, shown < total ? `${shown} / ${total} Angebote` : `${total} Angebote`),
     );
+  }
+
+
+  _openLightbox(offer) {
+    this._closeLightbox();
+
+    const overlay = document.createElement("div");
+    overlay.className = "lightbox-overlay";
+
+    const inner = document.createElement("div");
+    inner.className = "lightbox-inner";
+
+    // Close button
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "lightbox-close";
+    closeBtn.innerHTML = "&#x2715;";
+    closeBtn.onclick = (e) => { e.stopPropagation(); this._closeLightbox(); };
+
+    // Image
+    const img = document.createElement("img");
+    img.className = "lightbox-img";
+    img.src = offer.image_url;
+    img.alt = offer.description || offer.item;
+
+    // Caption
+    const caption = document.createElement("div");
+    caption.className = "lightbox-caption";
+    caption.textContent = offer.description || offer.item || "";
+
+    const sub = document.createElement("div");
+    sub.className = "lightbox-sub";
+    sub.textContent = `${offer.retailer}  ·  ${offer.price}  ·  ${offer.valid_from || ""}${offer.valid_to ? " – " + offer.valid_to : ""}`;
+
+    // Action buttons
+    const actions = document.createElement("div");
+    actions.className = "lightbox-actions";
+
+    // Button: Artikel ergänzen
+    const btnEnrich = document.createElement("button");
+    btnEnrich.className = "lb-btn";
+    btnEnrich.innerHTML = `&#x270F; Artikel ergänzen`;
+    btnEnrich.title = `Umbenennen zu: "${offer.item} (${offer.retailer} ${offer.price})"`;
+    btnEnrich.onclick = (e) => { e.stopPropagation(); this._enrichItem(offer, btnEnrich); };
+
+    // Button: Auf Liste verschieben
+    const btnMove = document.createElement("button");
+    btnMove.className = "lb-btn";
+    btnMove.innerHTML = `&#x27A1; Auf Liste verschieben`;
+    btnMove.onclick = (e) => { e.stopPropagation(); this._showListPicker(offer, inner, btnMove); };
+
+    actions.append(btnEnrich, btnMove);
+    inner.append(closeBtn, img, caption, sub, actions);
+    overlay.appendChild(inner);
+
+    overlay.onclick = (e) => { if (e.target === overlay) this._closeLightbox(); };
+    this._lightboxKeyHandler = (e) => { if (e.key === "Escape") this._closeLightbox(); };
+    document.addEventListener("keydown", this._lightboxKeyHandler);
+
+    this.shadowRoot.appendChild(overlay);
+    this._lightboxEl = overlay;
+  }
+
+  /** Rename the todo item to include price/retailer info */
+  async _enrichItem(offer, btn) {
+    const newName = `${offer.item} (${offer.retailer} ${offer.price})`;
+    const sourceLists = this._config.source_lists
+      || this._hass?.states?.[this._config.entity]?.attributes?.source_lists
+      || [];
+
+    // Find which list contains this item (try all configured lists)
+    const stateObj = this._hass.states[this._config.entity];
+    const allLists = stateObj?.attributes?.todo_lists ?? sourceLists;
+
+    let found = false;
+    for (const listId of allLists) {
+      try {
+        const result = await this._hass.callService("todo", "update_item", {
+          entity_id: listId,
+          item: offer.item,
+          rename: newName,
+        }, true);
+        found = true;
+        break;
+      } catch (_) { /* try next list */ }
+    }
+
+    if (found) {
+      btn.classList.add("success");
+      btn.innerHTML = `&#x2713; Umbenannt`;
+      setTimeout(() => {
+        btn.classList.remove("success");
+        btn.innerHTML = `&#x270F; Artikel ergänzen`;
+      }, 2500);
+    } else {
+      btn.classList.add("error");
+      btn.innerHTML = `&#x2715; Fehler`;
+      setTimeout(() => {
+        btn.classList.remove("error");
+        btn.innerHTML = `&#x270F; Artikel ergänzen`;
+      }, 2500);
+    }
+  }
+
+  /** Show a list picker to move the item to another todo list */
+  _showListPicker(offer, inner, btnMove) {
+    // Remove existing picker if open (toggle)
+    const existing = inner.querySelector(".list-picker");
+    if (existing) { existing.remove(); return; }
+
+    const allLists = this._getAllTodoLists();
+    if (!allLists.length) return;
+
+    const picker = document.createElement("div");
+    picker.className = "list-picker";
+
+    const title = document.createElement("div");
+    title.className = "list-picker-title";
+    title.textContent = "Ziel-Liste wählen";
+    picker.appendChild(title);
+
+    for (const { id, name } of allLists) {
+      const item = document.createElement("button");
+      item.className = "list-picker-item";
+      item.textContent = name;
+      item.onclick = async (e) => {
+        e.stopPropagation();
+        await this._moveItem(offer, id, btnMove);
+        picker.remove();
+      };
+      picker.appendChild(item);
+    }
+
+    inner.appendChild(picker);
+  }
+
+  /** Move item: add to target list, remove from source list */
+  async _moveItem(offer, targetListId, btn) {
+    const stateObj = this._hass.states[this._config.entity];
+    const sourceLists = stateObj?.attributes?.todo_lists ?? [];
+
+    try {
+      // Add to target list
+      await this._hass.callService("todo", "add_item", {
+        entity_id: targetListId,
+        item: offer.item,
+      });
+
+      // Remove from all source lists
+      for (const listId of sourceLists) {
+        if (listId === targetListId) continue;
+        try {
+          await this._hass.callService("todo", "remove_item", {
+            entity_id: listId,
+            item: offer.item,
+          });
+        } catch (_) { /* item may not be on this list */ }
+      }
+
+      btn.classList.add("success");
+      const targetName = this._hass.states[targetListId]?.attributes?.friendly_name ?? targetListId;
+      btn.innerHTML = `&#x2713; Verschoben nach ${targetName}`;
+      setTimeout(() => {
+        btn.classList.remove("success");
+        btn.innerHTML = `&#x27A1; Auf Liste verschieben`;
+      }, 3000);
+    } catch (err) {
+      btn.classList.add("error");
+      btn.innerHTML = `&#x2715; Fehler`;
+      setTimeout(() => {
+        btn.classList.remove("error");
+        btn.innerHTML = `&#x27A1; Auf Liste verschieben`;
+      }, 2500);
+    }
+  }
+
+  /** Return all todo entities known to hass as [{id, name}] */
+  _getAllTodoLists() {
+    if (!this._hass) return [];
+    return Object.entries(this._hass.states)
+      .filter(([id]) => id.startsWith("todo."))
+      .map(([id, state]) => ({
+        id,
+        name: state.attributes?.friendly_name ?? id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  _closeLightbox() {
+    if (this._lightboxEl) {
+      this._lightboxEl.remove();
+      this._lightboxEl = null;
+    }
+    if (this._lightboxKeyHandler) {
+      document.removeEventListener("keydown", this._lightboxKeyHandler);
+      this._lightboxKeyHandler = null;
+    }
   }
 
   async _callRefresh(btn) {

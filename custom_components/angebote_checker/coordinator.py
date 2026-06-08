@@ -106,7 +106,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if not unique_items:
             _LOGGER.warning("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
-            return {ATTR_OFFERS: [], ATTR_LAST_UPDATE: now_iso}
+            return {ATTR_OFFERS: [], ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
         retailer_filter = self._retailers if self._retailers else None
         _LOGGER.info("AC: Händlerfilter: %s", retailer_filter)
