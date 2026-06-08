@@ -826,65 +826,58 @@ class AngeboteCheckerCard extends HTMLElement {
   }
 
   /** Rename the todo item to include price/retailer info */
+  /** Find which list contains this item by reading hass.states attributes.
+   *  Returns the entity_id of the first list that has the item, or null.
+   */
+  _findItemInLists(itemName, listIds) {
+    const needle = itemName.toLowerCase().trim();
+    for (const listId of listIds) {
+      const state = this._hass.states[listId];
+      if (!state) continue;
+      const items = state.attributes?.items ?? [];
+      const found = items.some(i => {
+        const summary = (i.summary ?? i.name ?? "").toLowerCase().trim();
+        return summary === needle;
+      });
+      if (found) return listId;
+    }
+    return null;
+  }
+
   async _enrichItem(offer, btn) {
     const newName = `${offer.item} (${offer.retailer} ${offer.price})`;
     const stateObj = this._hass.states[this._config.entity];
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
-    // First find which list actually contains this item by reading items
-    let targetListId = null;
-    for (const listId of allLists) {
-      try {
-        const result = await this._hass.callService("todo", "get_items", {
-          entity_id: listId,
-          status: "needs_action",
-        }, { return_response: true });
-        const items = result?.[listId]?.items ?? [];
-        const match = items.find(i =>
-          (i.summary ?? i.name ?? "").toLowerCase() === offer.item.toLowerCase()
-        );
-        if (match) {
-          targetListId = listId;
-          break;
-        }
-      } catch (_) { /* continue */ }
-    }
+    // Find which list has this item via state attributes (no service call needed)
+    const targetListId = this._findItemInLists(offer.item, allLists);
 
     if (!targetListId) {
-      // Fallback: try update on all lists without pre-check
-      for (const listId of allLists) {
-        try {
-          await this._hass.callService("todo", "update_item", {
-            entity_id: listId,
-            item: offer.item,
-            rename: newName,
-          });
-          targetListId = listId;
-          break;
-        } catch (_) { /* continue */ }
-      }
-    } else {
-      try {
-        await this._hass.callService("todo", "update_item", {
-          entity_id: targetListId,
-          item: offer.item,
-          rename: newName,
-        });
-      } catch (err) {
-        targetListId = null;
-      }
+      btn.classList.add("error");
+      btn.innerHTML = `&#x2715; Nicht in Liste`;
+      setTimeout(() => {
+        btn.classList.remove("error");
+        btn.innerHTML = `&#x270F; Artikel ergänzen`;
+      }, 2500);
+      return;
     }
 
-    if (targetListId) {
+    try {
+      await this._hass.callService("todo", "update_item", {
+        entity_id: targetListId,
+        item: offer.item,
+        rename: newName,
+      });
       btn.classList.add("success");
       btn.innerHTML = `&#x2713; Umbenannt`;
       setTimeout(() => {
         btn.classList.remove("success");
         btn.innerHTML = `&#x270F; Artikel ergänzen`;
       }, 2500);
-    } else {
+    } catch (err) {
+      console.error("AC enrich error:", err);
       btn.classList.add("error");
-      btn.innerHTML = `&#x2715; Nicht gefunden`;
+      btn.innerHTML = `&#x2715; Fehler`;
       setTimeout(() => {
         btn.classList.remove("error");
         btn.innerHTML = `&#x270F; Artikel ergänzen`;
@@ -924,10 +917,13 @@ class AngeboteCheckerCard extends HTMLElement {
     inner.appendChild(picker);
   }
 
-  /** Move item: add to target list, remove from source lists */
+  /** Move item: add to target list, remove from source list */
   async _moveItem(offer, targetListId, btn) {
     const stateObj = this._hass.states[this._config.entity];
-    const sourceLists = stateObj?.attributes?.todo_lists ?? [];
+    const allLists = stateObj?.attributes?.todo_lists ?? [];
+
+    // Find the exact list that currently holds the item
+    const sourceListId = this._findItemInLists(offer.item, allLists);
 
     try {
       // Add to target list
@@ -936,20 +932,16 @@ class AngeboteCheckerCard extends HTMLElement {
         item: offer.item,
       });
 
-      // Remove from all source lists (items key must be a list)
-      for (const listId of sourceLists) {
-        if (listId === targetListId) continue;
-        try {
-          await this._hass.callService("todo", "remove_item", {
-            entity_id: listId,
-            item: [offer.item],
-          });
-        } catch (_) { /* item may not be on this list */ }
+      // Remove from source list (only the list that actually has it)
+      if (sourceListId && sourceListId !== targetListId) {
+        await this._hass.callService("todo", "remove_item", {
+          entity_id: sourceListId,
+          item: offer.item,
+        });
       }
 
       btn.classList.add("success");
-      const targetState = this._hass.states[targetListId];
-      const targetName = targetState?.attributes?.friendly_name ?? targetListId;
+      const targetName = this._hass.states[targetListId]?.attributes?.friendly_name ?? targetListId;
       btn.innerHTML = `&#x2713; Verschoben nach ${targetName}`;
       setTimeout(() => {
         btn.classList.remove("success");
