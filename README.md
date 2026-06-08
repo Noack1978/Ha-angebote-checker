@@ -16,6 +16,13 @@ Eine HACS-kompatible Custom Integration, die deine HA-Einkaufslisten (Todo-Entit
 
 ### HACS (empfohlen)
 
+[![In HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Noack1978&repository=ha-angebote-checker&category=integration)
+
+1. Auf den Button klicken – HACS öffnet sich direkt mit diesem Repository
+2. **Herunterladen** klicken → Home Assistant neu starten
+
+Oder manuell als benutzerdefiniertes Repository:
+
 1. HACS öffnen → Integrationen → ⋮ → Benutzerdefiniertes Repository hinzufügen
 2. URL: `https://github.com/Noack1978/ha-angebote-checker` · Typ: Integration
 3. „Angebote Checker" installieren → Home Assistant neu starten
