@@ -818,25 +818,20 @@ class AngeboteCheckerCard extends HTMLElement {
   /** Rename the todo item to include price/retailer info */
   async _enrichItem(offer, btn) {
     const newName = `${offer.item} (${offer.retailer} ${offer.price})`;
-    const sourceLists = this._config.source_lists
-      || this._hass?.states?.[this._config.entity]?.attributes?.source_lists
-      || [];
-
-    // Find which list contains this item (try all configured lists)
     const stateObj = this._hass.states[this._config.entity];
-    const allLists = stateObj?.attributes?.todo_lists ?? sourceLists;
+    const allLists = stateObj?.attributes?.todo_lists ?? [];
 
     let found = false;
     for (const listId of allLists) {
       try {
-        const result = await this._hass.callService("todo", "update_item", {
+        await this._hass.callService("todo", "update_item", {
           entity_id: listId,
           item: offer.item,
           rename: newName,
-        }, true);
+        });
         found = true;
         break;
-      } catch (_) { /* try next list */ }
+      } catch (_) { /* item may not be on this list, try next */ }
     }
 
     if (found) {
@@ -888,7 +883,7 @@ class AngeboteCheckerCard extends HTMLElement {
     inner.appendChild(picker);
   }
 
-  /** Move item: add to target list, remove from source list */
+  /** Move item: add to target list, remove from source lists */
   async _moveItem(offer, targetListId, btn) {
     const stateObj = this._hass.states[this._config.entity];
     const sourceLists = stateObj?.attributes?.todo_lists ?? [];
@@ -900,7 +895,7 @@ class AngeboteCheckerCard extends HTMLElement {
         item: offer.item,
       });
 
-      // Remove from all source lists
+      // Remove from all source lists (items key must be a list)
       for (const listId of sourceLists) {
         if (listId === targetListId) continue;
         try {
@@ -912,32 +907,52 @@ class AngeboteCheckerCard extends HTMLElement {
       }
 
       btn.classList.add("success");
-      const targetName = this._hass.states[targetListId]?.attributes?.friendly_name ?? targetListId;
+      const targetState = this._hass.states[targetListId];
+      const targetName = targetState?.attributes?.friendly_name ?? targetListId;
       btn.innerHTML = `&#x2713; Verschoben nach ${targetName}`;
       setTimeout(() => {
         btn.classList.remove("success");
         btn.innerHTML = `&#x27A1; Auf Liste verschieben`;
       }, 3000);
     } catch (err) {
+      console.error("AC move error:", err);
       btn.classList.add("error");
-      btn.innerHTML = `&#x2715; Fehler`;
+      btn.innerHTML = `&#x2715; Fehler: ${err.message ?? err}`;
       setTimeout(() => {
         btn.classList.remove("error");
         btn.innerHTML = `&#x27A1; Auf Liste verschieben`;
-      }, 2500);
+      }, 3000);
     }
   }
 
-  /** Return all todo entities known to hass as [{id, name}] */
+  /** Return all todo entities as [{id, name}].
+   *  Combines hass.states (frontend-visible) with the sensor's todo_lists
+   *  attribute (backend-configured) so all lists are always shown.
+   */
   _getAllTodoLists() {
     if (!this._hass) return [];
-    return Object.entries(this._hass.states)
-      .filter(([id]) => id.startsWith("todo."))
-      .map(([id, state]) => ({
-        id,
-        name: state.attributes?.friendly_name ?? id,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const seen = new Set();
+    const lists = [];
+
+    // From hass.states (may not include all todo entities on mobile)
+    for (const [id, state] of Object.entries(this._hass.states)) {
+      if (!id.startsWith("todo.")) continue;
+      seen.add(id);
+      lists.push({ id, name: state.attributes?.friendly_name ?? id });
+    }
+
+    // From sensor attribute (always contains the configured lists)
+    const stateObj = this._hass.states[this._config.entity];
+    const configuredLists = stateObj?.attributes?.todo_lists ?? [];
+    for (const id of configuredLists) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const state = this._hass.states[id];
+      lists.push({ id, name: state?.attributes?.friendly_name ?? id });
+    }
+
+    return lists.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   _closeLightbox() {
