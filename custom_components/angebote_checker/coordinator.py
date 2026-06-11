@@ -41,10 +41,10 @@ async def _get_todo_items(hass: HomeAssistant, list_entity_id: str) -> list[str]
             _LOGGER.debug("AC: Service-Ergebnis für '%s': %s", list_entity_id, result)
             items = result.get(list_entity_id, {}).get("items", [])
             names = [item.get("summary", "").strip() for item in items if item.get("summary")]
-            _LOGGER.info("AC: Liste '%s' → %d Artikel: %s", list_entity_id, len(names), names)
+            _LOGGER.debug("AC: Liste '%s' → %d Artikel: %s", list_entity_id, len(names), names)
             return names
         except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("AC: Service fehlgeschlagen für '%s': %s", list_entity_id, err)
+            _LOGGER.debug("AC: Service fehlgeschlagen für '%s': %s", list_entity_id, err)
 
     # Fallback: state attributes
     _LOGGER.debug("AC: Fallback – lese Attribute von '%s'", list_entity_id)
@@ -64,7 +64,7 @@ async def _get_todo_items(hass: HomeAssistant, list_entity_id: str) -> list[str]
         and item.get("status", "needs_action") == "needs_action"
         and (item.get("summary") or item.get("name"))
     ]
-    _LOGGER.info("AC: Liste '%s' (Fallback) → %d Artikel: %s", list_entity_id, len(names), names)
+    _LOGGER.debug("AC: Liste '%s' (Fallback) → %d Artikel: %s", list_entity_id, len(names), names)
     return names
 
 
@@ -77,7 +77,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._retailers: list[str] = config_data.get(CONF_RETAILERS, [])
         interval_minutes: int = config_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
-        _LOGGER.info(
+        _LOGGER.debug(
             "AC: Coordinator init – PLZ=%s, Listen=%s, Händler=%s, Intervall=%d min",
             self._zip_code, self._todo_lists, self._retailers, interval_minutes,
         )
@@ -91,7 +91,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch fresh offer data."""
-        _LOGGER.info("AC: Starte Aktualisierung – Listen: %s", self._todo_lists)
+        _LOGGER.debug("AC: Starte Aktualisierung – Listen: %s", self._todo_lists)
 
         all_items: list[str] = []
         for list_id in self._todo_lists:
@@ -102,14 +102,14 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         unique_items = [x for x in all_items if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
 
         now_iso = datetime.now(UTC).isoformat()
-        _LOGGER.info("AC: Eindeutige Artikel gesamt: %d → %s", len(unique_items), unique_items)
+        _LOGGER.debug("AC: Eindeutige Artikel gesamt: %d → %s", len(unique_items), unique_items)
 
         if not unique_items:
-            _LOGGER.warning("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
+            _LOGGER.debug("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
             return {ATTR_OFFERS: [], ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
         retailer_filter = self._retailers if self._retailers else None
-        _LOGGER.info("AC: Händlerfilter: %s", retailer_filter)
+        _LOGGER.debug("AC: Händlerfilter: %s", retailer_filter)
 
         session = async_get_clientsession(self.hass)
         api = MarktguruAPI(session, self._zip_code)
@@ -119,7 +119,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abruf der Angebote: {err}") from err
 
-        _LOGGER.info("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
+        _LOGGER.debug("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
         return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
     async def async_refresh_now(self) -> None:
