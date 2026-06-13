@@ -27,22 +27,16 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up sensor entities for this config entry."""
     coordinator: AngeboteCheckerCoordinator = entry.runtime_data
     friendly_name = entry.data.get(CONF_NAME, DEFAULT_NAME)
     async_add_entities([AngeboteCheckerSensor(coordinator, entry, friendly_name)], True)
 
 
 class AngeboteCheckerSensor(CoordinatorEntity[AngeboteCheckerCoordinator], SensorEntity):
-    """Sensor holding the current list of found offers as state attributes.
-
-    _attr_has_entity_name is intentionally NOT set to True here because
-    this entity has no associated DeviceInfo. Using it without a device
-    would produce a HA warning. The entity name is set directly via
-    _attr_name instead.
-    """
+    """Sensor holding the current list of found offers as state attributes."""
 
     _attr_icon = "mdi:tag-search"
+    _attr_force_update = True  # always push updates even if native_value unchanged
 
     def __init__(
         self,
@@ -64,6 +58,10 @@ class AngeboteCheckerSensor(CoordinatorEntity[AngeboteCheckerCoordinator], Senso
     @property
     def native_unit_of_measurement(self) -> str:
         return "Angebote"
+
+    @property
+    def should_poll(self) -> bool:
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
