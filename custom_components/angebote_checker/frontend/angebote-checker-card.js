@@ -884,8 +884,9 @@ class AngeboteCheckerCard extends HTMLElement {
         { entity_id: targetListId },
         false, false
       );
-      // Update offer.item so subsequent actions (e.g. move) use the new name
-      offer.item = newName;
+      // Track enriched name separately so _findItemInLists can find it via startsWith
+      // but offer.item stays as the original search term for display purposes
+      offer._enrichedName = newName;
 
       btn.classList.add("success");
       btn.innerHTML = `&#x2713; Umbenannt`;
@@ -942,6 +943,7 @@ class AngeboteCheckerCard extends HTMLElement {
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
     // Find exact list + exact current name (may be enriched)
+    // If item was just enriched, search by original name (startsWith handles enriched names)
     const sourceFound = await this._findItemInLists(offer.item, allLists);
 
     try {
