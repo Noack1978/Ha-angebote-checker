@@ -3,7 +3,7 @@
  * Custom Lovelace card for the Angebote Checker integration.
  * Displays supermarket offers found for shopping list items.
  *
- * @version 1.1.0
+ * @version 1.1.2
  * @author  Noack1978
  */
 
@@ -11,7 +11,7 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.2";
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
 

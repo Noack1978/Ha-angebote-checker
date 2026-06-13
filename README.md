@@ -79,6 +79,13 @@ Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
 
 ## Changelog
 
+### v1.1.2
+- 🐛 Fix: Umbenannte Artikel (z. B. „Butter (Lidl 0,99 €)") werden beim nächsten Angebots-Scan wieder korrekt gefunden – der Klammerinhalt mit Preis wird vor der Suche automatisch entfernt
+
+### v1.1.1
+- 🐛 Fix: `todo_lists`-Attribut wurde bei erfolgreicher API-Abfrage nicht an den Sensor übergeben → Ergänzen und Verschieben schlugen immer fehl
+- 🐛 Fix: Nach dem Ergänzen eines Artikels wird `offer.item` in der Lightbox aktualisiert, damit ein anschließendes Verschieben den neuen Namen kennt
+
 ### v1.1.0
 - 🔍 Lightbox: Produktbild per Klick vergrößerbar
 - ✏️ Artikel aus der Lightbox heraus mit Angebotsinformationen ergänzen
