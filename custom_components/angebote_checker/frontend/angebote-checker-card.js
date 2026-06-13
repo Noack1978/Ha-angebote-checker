@@ -941,11 +941,11 @@ class AngeboteCheckerCard extends HTMLElement {
     const stateObj = this._hass.states[this._config.entity];
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
-    // Find the exact list that currently holds the item
-    const sourceListId = await this._findItemInLists(offer.item, allLists);
+    // Find exact list + exact current name (may be enriched)
+    const sourceFound = await this._findItemInLists(offer.item, allLists);
 
     try {
-      // Add to target list
+      // Add to target list using original offer.item name
       await this._hass.callService(
         "todo", "add_item",
         { item: offer.item },
@@ -953,12 +953,14 @@ class AngeboteCheckerCard extends HTMLElement {
         false, false
       );
 
-      // Remove from source list (only the list that actually has it)
-      if (sourceListId && sourceListId !== targetListId) {
-        await this._hass.callService("todo", "remove_item", {
-          entity_id: sourceListId,
-          item: offer.item,
-        });
+      // Remove from source list using exact current name
+      if (sourceFound && sourceFound.listId !== targetListId) {
+        await this._hass.callService(
+          "todo", "remove_item",
+          { item: sourceFound.exactName },
+          { entity_id: sourceFound.listId },
+          false, false
+        );
       }
 
       btn.classList.add("success");
