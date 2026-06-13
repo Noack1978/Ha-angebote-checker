@@ -844,10 +844,15 @@ class AngeboteCheckerCard extends HTMLElement {
           true    // returnResponse
         );
         const items = result?.response?.[listId]?.items ?? [];
-        const found = items.some(i =>
-          (i.summary ?? i.name ?? "").toLowerCase().trim() === needle
-        );
-        if (found) return listId;
+        const match = items.find(i => {
+          const summary = (i.summary ?? i.name ?? "").toLowerCase().trim();
+          // Match exact OR already enriched: "Küchenrolle (Lidl 1,99 €)"
+          return summary === needle || summary.startsWith(needle + " (");
+        });
+        if (match) {
+          // Return both listId and the exact current name in the list
+          return { listId, exactName: match.summary ?? match.name };
+        }
       } catch (_) { /* list not accessible, try next */ }
     }
     return null;
@@ -859,9 +864,9 @@ class AngeboteCheckerCard extends HTMLElement {
     const allLists = stateObj?.attributes?.todo_lists ?? [];
 
     // Find which list has this item via state attributes (no service call needed)
-    const targetListId = await this._findItemInLists(offer.item, allLists);
+    const found = await this._findItemInLists(offer.item, allLists);
 
-    if (!targetListId) {
+    if (!found) {
       btn.classList.add("error");
       btn.innerHTML = `&#x2715; Nicht in Liste`;
       setTimeout(() => {
@@ -871,10 +876,11 @@ class AngeboteCheckerCard extends HTMLElement {
       return;
     }
 
+    const { listId: targetListId, exactName } = found;
     try {
       await this._hass.callService(
         "todo", "update_item",
-        { item: offer.item, rename: newName },
+        { item: exactName, rename: newName },
         { entity_id: targetListId },
         false, false
       );
