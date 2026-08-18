@@ -16,6 +16,10 @@ Eine HACS-kompatible Custom Integration, die deine HA-Einkaufslisten (Todo-Entit
 - ➡️ Artikel aus der Lightbox heraus auf eine andere Einkaufsliste verschieben
 - ✅ Vollständiger Config Flow – keine `configuration.yaml`-Änderungen nötig
 
+## Screenshots
+<img width="1220" height="3941" alt="1000062026" src="https://github.com/user-attachments/assets/330512b1-b811-4f32-8734-dfb8dbc76141" />
+
+
 ## Installation
 
 ### HACS (empfohlen)
