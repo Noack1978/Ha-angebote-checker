@@ -11,7 +11,7 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.1.2";
+const CARD_VERSION = "1.1.3";
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
 
@@ -697,12 +697,14 @@ class AngeboteCheckerCard extends HTMLElement {
 
   _buildOfferCard(offer) {
     const card = el("div", { class: "offer-card" });
+    card.style.cursor = "pointer";
+    card.onclick = () => this._openLightbox(offer);
 
     /* Image area */
     const imgWrap = el("div", { class: "offer-img-wrap" });
     if (this._config.show_images && offer.image_url) {
       imgWrap.classList.add("has-image");
-      imgWrap.onclick = () => this._openLightbox(offer);
+      imgWrap.onclick = (e) => { e.stopPropagation(); this._openLightbox(offer); };
       const img = el("img", { class: "offer-img", src: offer.image_url, alt: offer.description });
       img.onerror = () => {
         imgWrap.classList.remove("has-image");
@@ -739,6 +741,8 @@ class AngeboteCheckerCard extends HTMLElement {
 
   _buildOfferRow(offer) {
     const row = el("div", { class: "offer-row" });
+    row.style.cursor = "pointer";
+    row.onclick = () => this._openLightbox(offer);
     const left = el("div", { class: "offer-row-left" });
     left.append(
       el("div", { class: "offer-row-item" },     offer.item ?? ""),
