@@ -11,7 +11,7 @@ Eine HACS-kompatible Custom Integration, die deine HA-Einkaufslisten (Todo-Entit
 - 🔄 Automatische Aktualisierung (konfigurierbares Intervall, min. 5 Minuten)
 - ▶️ Manuelle Suche per Service-Button im Dashboard
 - 🖼️ Custom Lovelace-Karte mit Kachel- und Listenansicht, Händler-Filter-Chips und Produktbildern
-- 🔍 Lightbox: Produktbild per Klick vergrößern
+- 🔍 Lightbox: Produktbild oder Karte per Klick öffnen
 - ✏️ Artikel direkt aus der Karte mit Angebotsinformationen ergänzen (z. B. `Butter → Butter (Lidl 0,99 €)`)
 - ➡️ Artikel aus der Lightbox heraus auf eine andere Einkaufsliste verschieben
 - ✅ Vollständiger Config Flow – keine `configuration.yaml`-Änderungen nötig
@@ -69,7 +69,7 @@ default_view: grid
 | Kachel-/Listenansicht | Umschalten über die Buttons oben rechts |
 | Händler-Filter | Chips oberhalb der Angebote – Klick filtert nach Händler |
 | Suchen-Button | Löst sofort eine neue API-Abfrage aus |
-| Bild vergrößern | Klick auf ein Produktbild öffnet die Lightbox |
+| Karte/Zeile anklicken | Klick auf Kachel oder Listenzeile öffnet die Lightbox |
 | Artikel ergänzen | In der Lightbox: benennt den Todo-Eintrag um (fügt Händler + Preis hinzu) |
 | Liste verschieben | In der Lightbox: verschiebt den Artikel auf eine andere Todo-Liste |
 
@@ -82,6 +82,10 @@ service: angebote_checker.refresh
 Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
 
 ## Changelog
+
+### v1.1.4
+- 🖱️ Klick auf die gesamte Angebotskachel (Grid-Ansicht) öffnet die Lightbox – nicht mehr nur das Produktbild
+- 🖱️ Klick auf eine beliebige Stelle in der Listenzeile öffnet die Lightbox
 
 ### v1.1.2
 - 🐛 Fix: Umbenannte Artikel (z. B. „Butter (Lidl 0,99 €)") werden beim nächsten Angebots-Scan wieder korrekt gefunden – der Klammerinhalt mit Preis wird vor der Suche automatisch entfernt
