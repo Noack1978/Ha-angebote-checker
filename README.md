@@ -87,6 +87,13 @@ Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
 - 🖱️ Klick auf die gesamte Angebotskachel (Grid-Ansicht) öffnet die Lightbox – nicht mehr nur das Produktbild
 - 🖱️ Klick auf eine beliebige Stelle in der Listenzeile öffnet die Lightbox
 
+### v1.1.3
+- 🐛 Fix: Lovelace-Karten-Registrierung für HA 2026.8+ repariert – Attribut `resource_mode` statt veraltetem `mode`
+- 🐛 Fix: Roher Zugriff auf internen `lovelace_resources`-Speicher entfernt (konnte bestehende Einträge überschreiben)
+- 🔄 Registrierung läuft jetzt mit Wiederholungsversuchen bis Lovelace-Ressourcen geladen sind
+- 🔗 Ressourcen-URL enthält jetzt Versions-Parameter als Cache-Busting
+- 📄 `manifest.json`: fehlende `frontend`-Abhängigkeit ergänzt
+
 ### v1.1.2
 - 🐛 Fix: Umbenannte Artikel (z. B. „Butter (Lidl 0,99 €)") werden beim nächsten Angebots-Scan wieder korrekt gefunden – der Klammerinhalt mit Preis wird vor der Suche automatisch entfernt
 
