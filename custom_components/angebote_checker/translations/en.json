@@ -2,37 +2,58 @@
   "config": {
     "step": {
       "user": {
-        "title": "Angebote Checker einrichten",
-        "description": "Verbinde deine Einkaufslisten mit dem Marktguru-Angebotsdienst.",
+        "title": "Set up Angebote Checker",
+        "description": "Choose the Marktguru service of your country.",
         "data": {
-          "name": "Name dieser Instanz",
-          "zip_code": "Postleitzahl (z. B. 12345)",
-          "todo_lists": "Einkaufslisten (mehrere wählbar)",
-          "retailers": "Händler prüfen (leer = alle)",
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "name": "Name of this instance",
+          "country": "Country"
+        }
+      },
+      "details": {
+        "title": "Angebote Checker – Details",
+        "description": "Connect your shopping lists to the Marktguru offers service.",
+        "data": {
+          "zip_code": "Postal code (DE: 5 digits, AT: 4 digits)",
+          "todo_lists": "Shopping lists (multiple allowed)",
+          "retailers": "Retailers to check (empty = all)",
+          "scan_interval": "Update interval (minutes)"
         }
       }
     },
     "error": {
-      "invalid_zip": "Ungültige Postleitzahl – bitte 5-stellige PLZ eingeben.",
-      "api_error": "Fehler bei der Verbindung zur Marktguru-API."
+      "invalid_zip": "Invalid postal code.",
+      "invalid_zip_de": "Invalid postal code – please enter a 5-digit postal code.",
+      "invalid_zip_at": "Invalid postal code – please enter a 4-digit postal code.",
+      "api_error": "Error connecting to the Marktguru API."
     },
     "abort": {
-      "no_lists": "Keine Einkaufslisten gefunden. Bitte zuerst eine Todo-Liste anlegen.",
-      "already_configured": "Diese Instanz ist bereits konfiguriert."
+      "no_lists": "No shopping lists found. Please create a to-do list first.",
+      "already_configured": "This instance is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Angebote Checker – Einstellungen",
+        "title": "Angebote Checker – Settings",
+        "description": "If you change the country, adjust postal code and retailers in the next step.",
         "data": {
-          "zip_code": "Postleitzahl",
-          "todo_lists": "Einkaufslisten",
-          "retailers": "Händler prüfen (leer = alle)",
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "country": "Country"
+        }
+      },
+      "details": {
+        "title": "Angebote Checker – Settings",
+        "data": {
+          "zip_code": "Postal code (DE: 5 digits, AT: 4 digits)",
+          "todo_lists": "Shopping lists",
+          "retailers": "Retailers to check (empty = all)",
+          "scan_interval": "Update interval (minutes)"
         }
       }
+    },
+    "error": {
+      "invalid_zip": "Invalid postal code.",
+      "invalid_zip_de": "Invalid postal code – please enter a 5-digit postal code.",
+      "invalid_zip_at": "Invalid postal code – please enter a 4-digit postal code."
     }
   }
 }
