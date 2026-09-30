@@ -14,10 +14,12 @@ from .api import MarktguruAPI
 from .const import (
     ATTR_LAST_UPDATE,
     ATTR_OFFERS,
+    CONF_COUNTRY,
     CONF_RETAILERS,
     CONF_SCAN_INTERVAL,
     CONF_TODO_LISTS,
     CONF_ZIP_CODE,
+    DEFAULT_COUNTRY,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -89,13 +91,14 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def __init__(self, hass: HomeAssistant, config_data: dict[str, Any]) -> None:
         self._zip_code: str = config_data[CONF_ZIP_CODE]
+        self._country: str = config_data.get(CONF_COUNTRY, DEFAULT_COUNTRY)
         self._todo_lists: list[str] = config_data.get(CONF_TODO_LISTS, [])
         self._retailers: list[str] = config_data.get(CONF_RETAILERS, [])
         interval_minutes: int = config_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
         _LOGGER.info(
-            "AC: Coordinator init – PLZ=%s, Listen=%s, Händler=%s, Intervall=%d min",
-            self._zip_code, self._todo_lists, self._retailers, interval_minutes,
+            "AC: Coordinator init – Land=%s, PLZ=%s, Listen=%s, Händler=%s, Intervall=%d min",
+            self._country, self._zip_code, self._todo_lists, self._retailers, interval_minutes,
         )
 
         super().__init__(
@@ -128,7 +131,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.info("AC: Händlerfilter: %s", retailer_filter)
 
         session = async_get_clientsession(self.hass)
-        api = MarktguruAPI(session, self._zip_code)
+        api = MarktguruAPI(session, self._zip_code, self._country)
 
         try:
             offers = await api.search_multiple(unique_items, retailer_filter)

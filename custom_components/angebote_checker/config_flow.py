@@ -22,20 +22,25 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    COUNTRY_OPTIONS,
+    CONF_COUNTRY,
     CONF_NAME,
     CONF_RETAILERS,
     CONF_SCAN_INTERVAL,
     CONF_TODO_LISTS,
     CONF_ZIP_CODE,
+    DEFAULT_COUNTRY,
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    RETAILER_OPTIONS,
+    get_country,
 )
 
 
-def _zip_valid(value: str) -> bool:
-    return bool(re.fullmatch(r"\d{5}", value.strip()))
+def _zip_valid(value: str, country: str = DEFAULT_COUNTRY) -> bool:
+    """Validate the postal code against the country's pattern (DE: 5, AT: 4 digits)."""
+    pattern = get_country(country)["zip_pattern"]
+    return bool(re.fullmatch(pattern, value.strip()))
 
 
 async def _get_todo_lists(hass) -> dict[str, str]:
@@ -63,11 +68,11 @@ def _normalize_input(user_input: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _build_user_schema(
-    todo_options: dict[str, str],
+def _build_country_schema(
     defaults: dict[str, Any] | None = None,
     include_name: bool = True,
 ) -> vol.Schema:
+    """Step 1: instance name (initial setup only) and country."""
     d = defaults or {}
     fields: dict[vol.Marker, Any] = {}
 
@@ -76,7 +81,33 @@ def _build_user_schema(
             TextSelectorConfig(type=TextSelectorType.TEXT)
         )
 
-    fields[vol.Required(CONF_ZIP_CODE, default=d.get(CONF_ZIP_CODE, ""))] = TextSelector(
+    fields[vol.Required(CONF_COUNTRY, default=d.get(CONF_COUNTRY, DEFAULT_COUNTRY))] = SelectSelector(
+        SelectSelectorConfig(
+            options=COUNTRY_OPTIONS,
+            multiple=False,
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+    return vol.Schema(fields)
+
+
+def _build_details_schema(
+    country: str,
+    todo_options: dict[str, str],
+    defaults: dict[str, Any] | None = None,
+) -> vol.Schema:
+    """Step 2: zip code, todo lists, retailers (country-specific) and interval."""
+    d = defaults or {}
+    retailer_options: list[str] = get_country(country)["retailers"]
+    # Händler eines anderen Landes aus den Vorgaben entfernen
+    retailer_default = [r for r in d.get(CONF_RETAILERS, []) if r in retailer_options]
+    # PLZ-Vorgabe nur übernehmen, wenn sie zum Land passt
+    zip_default = d.get(CONF_ZIP_CODE, "")
+    if zip_default and not _zip_valid(zip_default, country):
+        zip_default = ""
+
+    fields: dict[vol.Marker, Any] = {}
+    fields[vol.Required(CONF_ZIP_CODE, default=zip_default)] = TextSelector(
         TextSelectorConfig(type=TextSelectorType.TEXT)
     )
     fields[vol.Required(CONF_TODO_LISTS, default=d.get(CONF_TODO_LISTS, []))] = SelectSelector(
@@ -86,9 +117,9 @@ def _build_user_schema(
             mode=SelectSelectorMode.LIST,
         )
     )
-    fields[vol.Optional(CONF_RETAILERS, default=d.get(CONF_RETAILERS, []))] = SelectSelector(
+    fields[vol.Optional(CONF_RETAILERS, default=retailer_default)] = SelectSelector(
         SelectSelectorConfig(
-            options=RETAILER_OPTIONS,
+            options=retailer_options,
             multiple=True,
             mode=SelectSelectorMode.LIST,
         )
@@ -103,31 +134,48 @@ def _build_user_schema(
 
 
 class AngeboteCheckerConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the initial config flow."""
+    """Handle the initial config flow (step 1: country, step 2: details)."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._base: dict[str, Any] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        errors: dict[str, str] = {}
         todo_options = await _get_todo_lists(self.hass)
-
         if not todo_options:
             return self.async_abort(reason="no_lists")
 
         if user_input is not None:
-            data = _normalize_input(user_input)
-            if not _zip_valid(data[CONF_ZIP_CODE]):
-                errors[CONF_ZIP_CODE] = "invalid_zip"
+            self._base = dict(user_input)
+            return await self.async_step_details()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=_build_country_schema(include_name=True),
+        )
+
+    async def async_step_details(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        country = self._base.get(CONF_COUNTRY, DEFAULT_COUNTRY)
+        todo_options = await _get_todo_lists(self.hass)
+
+        if user_input is not None:
+            data = {**self._base, **_normalize_input(user_input)}
+            if not _zip_valid(data[CONF_ZIP_CODE], country):
+                errors[CONF_ZIP_CODE] = f"invalid_zip_{country}"
             else:
                 return self.async_create_entry(
                     title=data.get(CONF_NAME, DEFAULT_NAME),
                     data=data,
                 )
 
-        schema = _build_user_schema(todo_options, user_input, include_name=True)
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        schema = _build_details_schema(country, todo_options, user_input)
+        return self.async_show_form(step_id="details", data_schema=schema, errors=errors)
 
     @staticmethod
     @callback
@@ -136,13 +184,30 @@ class AngeboteCheckerConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class AngeboteCheckerOptionsFlow(OptionsFlow):
-    """Handle options (reconfigure) flow.
+    """Handle options (reconfigure) flow: step 1 country, step 2 details.
 
     Note: No __init__ accepting config_entry – that pattern is broken in HA 2025.12+.
     Use self.config_entry (provided by OptionsFlow base class) instead.
     """
 
+    def __init__(self) -> None:
+        self._country: str = DEFAULT_COUNTRY
+
     async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        current = {**self.config_entry.data, **self.config_entry.options}
+
+        if user_input is not None:
+            self._country = user_input[CONF_COUNTRY]
+            return await self.async_step_details()
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_build_country_schema(current, include_name=False),
+        )
+
+    async def async_step_details(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -151,10 +216,12 @@ class AngeboteCheckerOptionsFlow(OptionsFlow):
 
         if user_input is not None:
             data = _normalize_input(user_input)
-            if not _zip_valid(data[CONF_ZIP_CODE]):
-                errors[CONF_ZIP_CODE] = "invalid_zip"
+            if not _zip_valid(data[CONF_ZIP_CODE], self._country):
+                errors[CONF_ZIP_CODE] = f"invalid_zip_{self._country}"
             else:
+                data[CONF_COUNTRY] = self._country
                 return self.async_create_entry(title="", data=data)
 
-        schema = _build_user_schema(todo_options, current, include_name=False)
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        defaults = user_input if user_input is not None else current
+        schema = _build_details_schema(self._country, todo_options, defaults)
+        return self.async_show_form(step_id="details", data_schema=schema, errors=errors)

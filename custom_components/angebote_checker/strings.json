@@ -3,10 +3,17 @@
     "step": {
       "user": {
         "title": "Angebote Checker einrichten",
-        "description": "Verbinde deine Einkaufslisten mit dem Marktguru-Angebotsdienst.",
+        "description": "Wähle den Marktguru-Dienst deines Landes.",
         "data": {
           "name": "Name dieser Instanz",
-          "zip_code": "Postleitzahl (z. B. 12345)",
+          "country": "Land"
+        }
+      },
+      "details": {
+        "title": "Angebote Checker – Details",
+        "description": "Verbinde deine Einkaufslisten mit dem Marktguru-Angebotsdienst.",
+        "data": {
+          "zip_code": "Postleitzahl (DE: 5-stellig, AT: 4-stellig)",
           "todo_lists": "Einkaufslisten (mehrere wählbar)",
           "retailers": "Händler prüfen (leer = alle)",
           "scan_interval": "Aktualisierungsintervall (Minuten)"
@@ -14,7 +21,9 @@
       }
     },
     "error": {
-      "invalid_zip": "Ungültige Postleitzahl – bitte 5-stellige PLZ eingeben.",
+      "invalid_zip": "Ungültige Postleitzahl.",
+      "invalid_zip_de": "Ungültige Postleitzahl – bitte 5-stellige PLZ eingeben.",
+      "invalid_zip_at": "Ungültige Postleitzahl – bitte 4-stellige PLZ eingeben.",
       "api_error": "Fehler bei der Verbindung zur Marktguru-API."
     },
     "abort": {
@@ -26,13 +35,25 @@
     "step": {
       "init": {
         "title": "Angebote Checker – Einstellungen",
+        "description": "Bei einem Länderwechsel bitte im nächsten Schritt PLZ und Händler anpassen.",
         "data": {
-          "zip_code": "Postleitzahl",
+          "country": "Land"
+        }
+      },
+      "details": {
+        "title": "Angebote Checker – Einstellungen",
+        "data": {
+          "zip_code": "Postleitzahl (DE: 5-stellig, AT: 4-stellig)",
           "todo_lists": "Einkaufslisten",
           "retailers": "Händler prüfen (leer = alle)",
           "scan_interval": "Aktualisierungsintervall (Minuten)"
         }
       }
+    },
+    "error": {
+      "invalid_zip": "Ungültige Postleitzahl.",
+      "invalid_zip_de": "Ungültige Postleitzahl – bitte 5-stellige PLZ eingeben.",
+      "invalid_zip_at": "Ungültige Postleitzahl – bitte 4-stellige PLZ eingeben."
     }
   }
 }
