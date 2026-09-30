@@ -44,7 +44,8 @@ Den Ordner `custom_components/angebote_checker/` in dein HA-Konfigurationsverzei
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Angebote Checker"**
 2. Konfigurieren:
    - **Name** der Instanz
-   - **Postleitzahl** (5-stellig) – bestimmt die regionale Suche
+   - **Land** – Deutschland (marktguru.de) oder Österreich (marktguru.at)
+   - **Postleitzahl** (DE: 5-stellig, AT: 4-stellig) – bestimmt die regionale Suche
    - **Einkaufslisten** – alle Todo-Entitäten, die geprüft werden sollen
    - **Händler** – optional einschränken; leer = alle Händler
    - **Aktualisierungsintervall** in Minuten (5–1440)
@@ -82,6 +83,12 @@ service: angebote_checker.refresh
 Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
 
 ## Changelog
+
+### v1.2.0
+- 🌍 Neu: Österreich-Support (marktguru.at, 4-stellige PLZ) – Land wird bei der Einrichtung und in den Optionen gewählt
+- 🏪 Händlerliste passend zum gewählten Land (AT: Billa, Spar, Hofer, Lidl, Penny, MPreis …)
+- 🔑 API-Keys für Österreich werden automatisch von marktguru.at ausgelesen und bei Ablauf (HTTP 401/403) erneuert
+- ♻️ Bestehende Einträge bleiben unverändert (Standard: Deutschland)
 
 ### v1.1.4
 - 🖱️ Klick auf die gesamte Angebotskachel (Grid-Ansicht) öffnet die Lightbox – nicht mehr nur das Produktbild
