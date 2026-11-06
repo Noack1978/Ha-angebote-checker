@@ -11,7 +11,7 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.3.0b3";
+const CARD_VERSION = "1.3.0b4";
 const RELEVANCE_VISIBLE = 5; // Standardmäßig angezeigte Top-Treffer pro Artikel
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
