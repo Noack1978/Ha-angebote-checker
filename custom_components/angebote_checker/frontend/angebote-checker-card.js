@@ -11,7 +11,8 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.1.3";
+const CARD_VERSION = "1.3.0";
+const RELEVANCE_VISIBLE = 5; // Standardmäßig angezeigte Top-Treffer pro Artikel
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
 
@@ -451,6 +452,25 @@ const CARD_STYLES = `
     align-items: center;
   }
 
+  /* ── Weitere anzeigen ── */
+  .more-btn-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 2px;
+  }
+  .btn-more {
+    background: var(--ac-surface);
+    border: 1px dashed var(--ac-border);
+    border-radius: 20px;
+    color: var(--ac-subtext);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 16px;
+    transition: all 0.15s;
+  }
+  .btn-more:hover { border-color: var(--ac-accent); color: var(--ac-accent); }
+
   /* ── View toggle ── */
   .view-toggle {
     display: flex;
@@ -604,9 +624,16 @@ class AngeboteCheckerCard extends HTMLElement {
     const titleWrap = el("div");
     const titleEl   = el("div", { class: "header-title" }, this._config.title);
     const subEl     = el("div", { class: "header-subtitle" });
-    subEl.textContent = unavailable
-      ? "Sensor nicht verfügbar"
-      : `${total} Angebote gefunden`;
+    if (unavailable) {
+      subEl.textContent = "Sensor nicht verfügbar";
+    } else if (total === 0) {
+      subEl.textContent = "Keine Angebote gefunden";
+    } else {
+      const topN = Math.min(total, RELEVANCE_VISIBLE);
+      subEl.textContent = total <= RELEVANCE_VISIBLE
+        ? `${total} Angebote gefunden`
+        : `Top ${topN} von ${total} Angeboten`;
+    }
     titleWrap.append(titleEl, subEl);
     left.append(iconWrap, titleWrap);
 
@@ -686,12 +713,55 @@ class AngeboteCheckerCard extends HTMLElement {
 
     if (this._view === "grid") {
       const grid = el("div", { class: "offers-grid" });
-      for (const offer of offers) grid.append(this._buildOfferCard(offer));
+      this._renderWithMoreButton(offers, grid,
+        (offer) => this._buildOfferCard(offer));
       this._contentEl.append(grid);
     } else {
       const list = el("div", { class: "offers-list" });
-      for (const offer of offers) list.append(this._buildOfferRow(offer));
+      this._renderWithMoreButton(offers, list,
+        (offer) => this._buildOfferRow(offer));
       this._contentEl.append(list);
+    }
+  }
+
+  /**
+   * Rendert Angebote gruppiert nach Artikel.
+   * Pro Artikel werden standardmäßig RELEVANCE_VISIBLE Treffer angezeigt.
+   * Schlechter scorende Treffer erscheinen hinter einem "X weitere"-Button.
+   */
+  _renderWithMoreButton(offers, container, buildFn) {
+    // Angebote nach Artikel (offer.item) gruppieren
+    const groups = new Map();
+    for (const offer of offers) {
+      const key = offer.item ?? "";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(offer);
+    }
+
+    for (const [, group] of groups) {
+      // Bereits nach Score sortiert (Coordinator), einfach aufteilen
+      const visible = group.slice(0, RELEVANCE_VISIBLE);
+      const hidden  = group.slice(RELEVANCE_VISIBLE);
+
+      for (const offer of visible) {
+        container.append(buildFn(offer));
+      }
+
+      if (hidden.length > 0) {
+        const wrap = el("div", { class: "more-btn-wrap" });
+        const btn  = el("button", { class: "btn-more" },
+          `${hidden.length} weitere Treffer anzeigen`);
+        btn.onclick = () => {
+          wrap.remove();
+          for (const offer of hidden) {
+            container.append(buildFn(offer));
+          }
+        };
+        wrap.append(btn);
+        // In Grid-Ansicht: Wrap über volle Breite strecken
+        wrap.style.gridColumn = "1 / -1";
+        container.append(wrap);
+      }
     }
   }
 
