@@ -7,6 +7,19 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+
+# ── Relevanz-Scoring ────────────────────────────────────────────────────────
+# Bewertet, wie gut ein Angebots-Treffer zum gesuchten Artikel passt.
+# Wortgrenzen werden berücksichtigt: "Milch" matcht nicht "Buttermilch" als
+# Volltreffer, da "milch" kein eigenständiges Wort am Anfang ist.
+#
+# Score-Tabelle:
+#   100 – Suchwort als ganzes Wort am Anfang des Beschreibungstexts
+#    70 – Suchwort als ganzes Wort irgendwo im Beschreibungstext
+#    40 – Suchwort als Teilstring am Anfang (kein Wortgrenzen-Match)
+#    20 – Suchwort als Teilstring irgendwo
+#     0 – kein direkter Treffer (API-Volltextmatch ohne Textübereinstimmung)
+_WORD_SPLIT_RE = re.compile(r"\W+")
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -25,6 +38,56 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _relevance_score(query: str, offer: dict[str, Any]) -> int:
+    """Return a relevance score (0–100) for how well *offer* matches *query*.
+
+    Wortgrenzen-basiertes Scoring: "Milch" als ganzes Wort am Anfang von
+    "Milch 1,5% fettarm" → 100 Punkte, aber in "Buttermilch" → 20 Punkte.
+    """
+    needle = query.lower().strip()
+    if not needle:
+        return 0
+
+    # Suche ausschließlich im Beschreibungstext des Angebots (nicht im Suchbegriff selbst)
+    haystack = str(offer.get("description", "") or "").lower()
+
+    if not haystack:
+        return 0
+
+    # Wörter des Haystacks für Wortgrenz-Check
+    words = _WORD_SPLIT_RE.split(haystack)
+    first_word = words[0] if words else ""
+
+    # Ganzes Wort am Anfang: höchste Relevanz
+    if first_word == needle:
+        return 100
+
+    # Ganzes Wort irgendwo im Text
+    if needle in words:
+        return 70
+
+    # Teilstring am Anfang (kein Wortgrenzen-Match)
+    if haystack.startswith(needle):
+        return 40
+
+    # Teilstring irgendwo
+    if needle in haystack:
+        return 20
+
+    return 0
+
+
+def _score_and_sort_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fügt jedem Angebot einen *relevance_score* hinzu und sortiert absteigend.
+
+    Treffer ohne jeden Textmatch (Score 0) landen am Ende, bleiben aber im
+    Datensatz – die Karte blendet sie optional hinter einem Button aus.
+    """
+    for offer in offers:
+        offer["relevance_score"] = _relevance_score(offer.get("item", ""), offer)
+    return sorted(offers, key=lambda o: o["relevance_score"], reverse=True)
 
 
 def _strip_offer_annotation(name: str) -> str:
@@ -137,6 +200,9 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             offers = await api.search_multiple(unique_items, retailer_filter)
         except Exception as err:
             raise UpdateFailed(f"Fehler beim Abruf der Angebote: {err}") from err
+
+        # Relevanz-Scoring: sortiert Treffer nach Übereinstimmung mit dem Suchbegriff
+        offers = _score_and_sort_offers(offers)
 
         _LOGGER.info("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
         return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
