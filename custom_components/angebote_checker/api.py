@@ -102,19 +102,34 @@ def _parse_entry(
     if offer_id:
         image_url = image_url_template.format(offer_id=offer_id)
 
-    # ── Description ───────────────────────────────────────────────────────
-    description = (
-        entry.get("description")
+    # ── Produktname ────────────────────────────────────────────────────────
+    # "name" = Produktname (z. B. "Milch"), "description" = Detailtext
+    # (z. B. "Versch. Sorten, 1-l-Packung"). Beide werden getrennt gespeichert,
+    # damit das Scoring gegen den tatsächlichen Produktnamen arbeiten kann.
+    product_name: str = (
+        entry.get("name")
         or (entry.get("product") or {}).get("name")
-        or entry.get("name")
         or ""
     )
+    description: str = entry.get("description") or ""
+
+    # Debug-Log: erste Treffer pro Suche, damit Feldstruktur sichtbar wird
+    _LOGGER.debug(
+        "AC: Rohfelder – name=%r  description=%r  product=%r",
+        entry.get("name"),
+        entry.get("description"),
+        (entry.get("product") or {}).get("name"),
+    )
+
+    # Fallback: wenn product_name leer ist, description als Anzeige-Text
+    display_description = description or product_name
 
     return {
         ATTR_ITEM_NAME: query,
         ATTR_PRICE: price_str,
         ATTR_RETAILER: retailer_name,
-        ATTR_DESCRIPTION: description,
+        ATTR_DESCRIPTION: display_description,
+        "product_name": product_name,       # Rohproduktname für Scoring
         ATTR_VALID_FROM: valid_from,
         ATTR_VALID_TO: valid_to,
         ATTR_IMAGE_URL: image_url,

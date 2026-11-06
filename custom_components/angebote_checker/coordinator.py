@@ -6,6 +6,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant
 
 # ── Relevanz-Scoring ────────────────────────────────────────────────────────
@@ -13,12 +14,19 @@ from homeassistant.core import HomeAssistant
 # Wortgrenzen werden berücksichtigt: "Milch" matcht nicht "Buttermilch" als
 # Volltreffer, da "milch" kein eigenständiges Wort am Anfang ist.
 #
-# Score-Tabelle:
-#   100 – Suchwort als ganzes Wort am Anfang des Beschreibungstexts
-#    70 – Suchwort als ganzes Wort irgendwo im Beschreibungstext
-#    40 – Suchwort als Teilstring am Anfang (kein Wortgrenzen-Match)
-#    20 – Suchwort als Teilstring irgendwo
-#     0 – kein direkter Treffer (API-Volltextmatch ohne Textübereinstimmung)
+# Priorität: Produktname (product_name) vor Beschreibungstext (description),
+# da der Produktname der tatsächliche API-Feldinhalt ist (z. B. "Milch"),
+# während description oft nur Details enthält ("Versch. Sorten, 1-l-Packung").
+#
+# Score-Tabelle (Produktname-Treffer):
+#   100 – Suchwort als ganzes Wort am Anfang des Produktnamens
+#    80 – Suchwort als ganzes Wort irgendwo im Produktnamen
+#    50 – Suchwort als Teilstring am Anfang des Produktnamens
+#    30 – Suchwort als Teilstring irgendwo im Produktnamen
+# Score-Tabelle (Fallback Beschreibungstext):
+#    25 – Suchwort als ganzes Wort im Beschreibungstext
+#    10 – Suchwort als Teilstring im Beschreibungstext
+#     0 – kein Treffer
 _WORD_SPLIT_RE = re.compile(r"\W+")
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -43,38 +51,51 @@ _LOGGER = logging.getLogger(__name__)
 def _relevance_score(query: str, offer: dict[str, Any]) -> int:
     """Return a relevance score (0–100) for how well *offer* matches *query*.
 
-    Wortgrenzen-basiertes Scoring: "Milch" als ganzes Wort am Anfang von
-    "Milch 1,5% fettarm" → 100 Punkte, aber in "Buttermilch" → 20 Punkte.
+    Scoring-Priorität:
+      1. Produktname (z. B. "Milch") – höchste Gewichtung, da direkt vom Anbieter
+      2. Beschreibungstext (z. B. "Versch. Sorten, 1-l-Packung") – sekundär
+
+    Wortgrenzen-Tabelle (Produktname-Treffer):
+      100 – Suchwort als ganzes Wort am Anfang des Produktnamens
+       80 – Suchwort als ganzes Wort irgendwo im Produktnamen
+       50 – Suchwort als Teilstring am Anfang des Produktnamens
+       30 – Suchwort als Teilstring irgendwo im Produktnamen
+
+    Fallback-Tabelle (nur Beschreibungstext, kein Produktname-Treffer):
+       25 – Suchwort als ganzes Wort im Beschreibungstext
+       10 – Suchwort als Teilstring im Beschreibungstext
+
+    Kein Treffer: 0
     """
     needle = query.lower().strip()
     if not needle:
         return 0
 
-    # Suche ausschließlich im Beschreibungstext des Angebots (nicht im Suchbegriff selbst)
-    haystack = str(offer.get("description", "") or "").lower()
+    # ── Primär: Produktname ──────────────────────────────────────────────────
+    # "product_name" enthält den tatsächlichen Produktnamen aus entry["name"],
+    # z. B. "Milch". "description" enthält Detailtext wie "Versch. Sorten, 1-l-Packung".
+    product_name = str(offer.get("product_name", "") or "").lower()
+    if product_name:
+        words_pn = _WORD_SPLIT_RE.split(product_name)
+        first_pn = words_pn[0] if words_pn else ""
 
-    if not haystack:
-        return 0
+        if first_pn == needle:
+            return 100
+        if needle in words_pn:
+            return 80
+        if product_name.startswith(needle):
+            return 50
+        if needle in product_name:
+            return 30
 
-    # Wörter des Haystacks für Wortgrenz-Check
-    words = _WORD_SPLIT_RE.split(haystack)
-    first_word = words[0] if words else ""
-
-    # Ganzes Wort am Anfang: höchste Relevanz
-    if first_word == needle:
-        return 100
-
-    # Ganzes Wort irgendwo im Text
-    if needle in words:
-        return 70
-
-    # Teilstring am Anfang (kein Wortgrenzen-Match)
-    if haystack.startswith(needle):
-        return 40
-
-    # Teilstring irgendwo
-    if needle in haystack:
-        return 20
+    # ── Sekundär: Beschreibungstext ──────────────────────────────────────────
+    description = str(offer.get("description", "") or "").lower()
+    if description:
+        words_desc = _WORD_SPLIT_RE.split(description)
+        if needle in words_desc:
+            return 25
+        if needle in description:
+            return 10
 
     return 0
 
@@ -158,6 +179,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._todo_lists: list[str] = config_data.get(CONF_TODO_LISTS, [])
         self._retailers: list[str] = config_data.get(CONF_RETAILERS, [])
         interval_minutes: int = config_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        self._startup_retry_scheduled: bool = False
 
         _LOGGER.info(
             "AC: Coordinator init – Land=%s, PLZ=%s, Listen=%s, Händler=%s, Intervall=%d min",
@@ -171,12 +193,33 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(minutes=interval_minutes),
         )
 
+        # Wenn HA beim Coordinator-Start noch nicht vollständig gestartet ist,
+        # registriere einen einmaligen Listener, der nach dem vollständigen HA-Start
+        # eine sofortige Aktualisierung auslöst. Damit werden Todo-Entitäten,
+        # die beim ersten Coordinator-Lauf noch nicht bereit waren, korrekt gelesen.
+        if not hass.is_running:
+            _LOGGER.debug("AC: HA noch nicht gestartet – registriere Startup-Listener")
+
+            async def _on_ha_started(_event: Any) -> None:
+                _LOGGER.info("AC: HA vollständig gestartet – löse sofortige Aktualisierung aus")
+                await self.async_refresh()
+
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_ha_started)
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch fresh offer data."""
         _LOGGER.info("AC: Starte Aktualisierung – Listen: %s", self._todo_lists)
 
         all_items: list[str] = []
+        entities_missing = False
         for list_id in self._todo_lists:
+            state = self.hass.states.get(list_id)
+            if state is None:
+                entities_missing = True
+                _LOGGER.warning(
+                    "AC: Entität '%s' noch nicht verfügbar – möglicherweise zu früher Start",
+                    list_id,
+                )
             items = await _get_todo_items(self.hass, list_id)
             all_items.extend(items)
 
@@ -187,7 +230,18 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.info("AC: Eindeutige Artikel gesamt: %d → %s", len(unique_items), unique_items)
 
         if not unique_items:
-            _LOGGER.warning("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
+            if entities_missing and not self._startup_retry_scheduled:
+                # Entitäten noch nicht bereit: in 60 s erneut versuchen
+                self._startup_retry_scheduled = True
+                _LOGGER.info(
+                    "AC: Entitäten fehlen – plane Wiederholungsversuch in 60 s"
+                )
+                self.hass.loop.call_later(
+                    60,
+                    lambda: self.hass.async_create_task(self.async_refresh()),
+                )
+            else:
+                _LOGGER.warning("AC: Keine Artikel in den Listen gefunden – API wird nicht abgefragt.")
             return {ATTR_OFFERS: [], ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
         retailer_filter = self._retailers if self._retailers else None
@@ -204,6 +258,7 @@ class AngeboteCheckerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Relevanz-Scoring: sortiert Treffer nach Übereinstimmung mit dem Suchbegriff
         offers = _score_and_sort_offers(offers)
 
+        self._startup_retry_scheduled = False  # Erfolgreicher Lauf: Flag zurücksetzen
         _LOGGER.info("AC: Fertig – %d Angebote für %d Artikel gefunden.", len(offers), len(unique_items))
         return {ATTR_OFFERS: offers, ATTR_LAST_UPDATE: now_iso, "todo_lists": self._todo_lists}
 
