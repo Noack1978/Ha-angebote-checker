@@ -107,8 +107,8 @@ def _parse_entry(
     # (z. B. "Versch. Sorten, 1-l-Packung"). Beide werden getrennt gespeichert,
     # damit das Scoring gegen den tatsächlichen Produktnamen arbeiten kann.
     product_name: str = (
-        entry.get("name")
-        or (entry.get("product") or {}).get("name")
+        (entry.get("product") or {}).get("name")
+        or entry.get("name")
         or ""
     )
     description: str = entry.get("description") or ""

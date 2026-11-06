@@ -19,10 +19,11 @@ from homeassistant.core import HomeAssistant
 # während description oft nur Details enthält ("Versch. Sorten, 1-l-Packung").
 #
 # Score-Tabelle (Produktname-Treffer):
-#   100 – Suchwort als ganzes Wort am Anfang des Produktnamens
-#    80 – Suchwort als ganzes Wort irgendwo im Produktnamen
-#    50 – Suchwort als Teilstring am Anfang des Produktnamens
-#    30 – Suchwort als Teilstring irgendwo im Produktnamen
+#   100 – Suchwort = exakter Produktname ("Milch" = "Milch")
+#    90 – Suchwort als ganzes Wort am Anfang ("Milch Reis")
+#    80 – Suchwort als ganzes Wort irgendwo ("Die Haltbare Milch")
+#    50 – Suchwort als Teilstring am Anfang ("Milchschnitte")
+#    30 – Suchwort als Teilstring irgendwo ("Buttermilch")
 # Score-Tabelle (Fallback Beschreibungstext):
 #    25 – Suchwort als ganzes Wort im Beschreibungstext
 #    10 – Suchwort als Teilstring im Beschreibungstext
@@ -79,12 +80,19 @@ def _relevance_score(query: str, offer: dict[str, Any]) -> int:
         words_pn = _WORD_SPLIT_RE.split(product_name)
         first_pn = words_pn[0] if words_pn else ""
 
-        if first_pn == needle:
+        # Exakter Namenstреffer: "Milch" = "Milch" → höchste Priorität
+        if product_name == needle:
             return 100
+        # Suchwort als ganzes Wort am Anfang: "Milch Reis" → 90
+        if first_pn == needle:
+            return 90
+        # Suchwort als ganzes Wort irgendwo: "Die Haltbare Milch" → 80
         if needle in words_pn:
             return 80
+        # Suchwort als Teilstring am Anfang: "Milchschnitte" → 50
         if product_name.startswith(needle):
             return 50
+        # Suchwort als Teilstring irgendwo: "Buttermilch" → 30
         if needle in product_name:
             return 30
 
