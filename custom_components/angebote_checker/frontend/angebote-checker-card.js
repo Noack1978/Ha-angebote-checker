@@ -11,7 +11,7 @@
 
 const CARD_NAME    = "angebote-checker-card";
 const EDITOR_NAME  = "angebote-checker-card-editor";
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.3.0b3";
 const RELEVANCE_VISIBLE = 5; // Standardmäßig angezeigte Top-Treffer pro Artikel
 
 /* ─── Styles ────────────────────────────────────────────────────────────── */
@@ -452,6 +452,21 @@ const CARD_STYLES = `
     align-items: center;
   }
 
+  /* ── Relevanz-Badge ── */
+  .score-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .score-high   { background: rgba(74,222,128,0.18); color: #4ade80; }
+  .score-medium { background: rgba(250,204,21,0.18);  color: #facc15; }
+  .score-low    { background: rgba(144,144,176,0.14); color: var(--ac-subtext); }
+
   /* ── Weitere anzeigen ── */
   .more-btn-wrap {
     display: flex;
@@ -520,6 +535,14 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
+/** Erstellt einen kleinen Score-Badge für ein Angebot. */
+function buildScoreBadge(offer) {
+  const score = offer.relevance_score ?? null;
+  if (score === null || score === undefined) return null;
+  const cls = score >= 70 ? "score-high" : score >= 25 ? "score-medium" : "score-low";
+  return el("span", { class: `score-badge ${cls}` }, `${score}`);
+}
+
 /* ─── Main card element ─────────────────────────────────────────────────── */
 
 class AngeboteCheckerCard extends HTMLElement {
@@ -536,6 +559,8 @@ class AngeboteCheckerCard extends HTMLElement {
     this._view      = "grid"; // "grid" | "list"
     this._spinning  = false;
     this._rendered  = false;
+    // Merkt sich, welche Artikel-Gruppen aufgeklappt wurden (item-Key → true)
+    this._expandedGroups = new Set();
   }
 
   /* Called by HA with new hass object on every state change */
@@ -641,12 +666,12 @@ class AngeboteCheckerCard extends HTMLElement {
     const toggle = el("div", { class: "view-toggle" });
     const btnGrid = el("button", {
       class: `view-btn${this._view === "grid" ? " active" : ""}`,
-      onclick: () => { this._view = "grid"; this._rendered = false; this._render(); },
+      onclick: () => { this._view = "grid"; this._expandedGroups.clear(); this._rendered = false; this._render(); },
     });
     btnGrid.innerHTML = ICON_GRID;
     const btnList = el("button", {
       class: `view-btn${this._view === "list" ? " active" : ""}`,
-      onclick: () => { this._view = "list"; this._rendered = false; this._render(); },
+      onclick: () => { this._view = "list"; this._expandedGroups.clear(); this._rendered = false; this._render(); },
     });
     btnList.innerHTML = ICON_LIST;
     toggle.append(btnGrid, btnList);
@@ -672,14 +697,14 @@ class AngeboteCheckerCard extends HTMLElement {
 
     const all = el("button", {
       class: `filter-pill${this._activeFilter === "all" ? " active" : ""}`,
-      onclick: () => { this._activeFilter = "all"; this._render(); },
+      onclick: () => { this._activeFilter = "all"; this._expandedGroups.clear(); this._render(); },
     }, "Alle");
     this._filterEl.append(all);
 
     for (const r of retailers) {
       const pill = el("button", {
         class: `filter-pill${this._activeFilter === r ? " active" : ""}`,
-        onclick: () => { this._activeFilter = r; this._render(); },
+        onclick: () => { this._activeFilter = r; this._expandedGroups.clear(); this._render(); },
       }, r);
       this._filterEl.append(pill);
     }
@@ -728,6 +753,8 @@ class AngeboteCheckerCard extends HTMLElement {
    * Rendert Angebote gruppiert nach Artikel.
    * Pro Artikel werden standardmäßig RELEVANCE_VISIBLE Treffer angezeigt.
    * Schlechter scorende Treffer erscheinen hinter einem "X weitere"-Button.
+   * Der Aufklapp-Zustand wird in _expandedGroups gespeichert und überlebt
+   * nachfolgende _render()-Aufrufe (HA sendet bei jedem State-Update einen neuen hass).
    */
   _renderWithMoreButton(offers, container, buildFn) {
     // Angebote nach Artikel (offer.item) gruppieren
@@ -738,7 +765,7 @@ class AngeboteCheckerCard extends HTMLElement {
       groups.get(key).push(offer);
     }
 
-    for (const [, group] of groups) {
+    for (const [key, group] of groups) {
       // Bereits nach Score sortiert (Coordinator), einfach aufteilen
       const visible = group.slice(0, RELEVANCE_VISIBLE);
       const hidden  = group.slice(RELEVANCE_VISIBLE);
@@ -748,19 +775,28 @@ class AngeboteCheckerCard extends HTMLElement {
       }
 
       if (hidden.length > 0) {
-        const wrap = el("div", { class: "more-btn-wrap" });
-        const btn  = el("button", { class: "btn-more" },
-          `${hidden.length} weitere Treffer anzeigen`);
-        btn.onclick = () => {
-          wrap.remove();
+        // Gruppe bereits aufgeklappt? Dann direkt alle rendern, kein Button
+        if (this._expandedGroups.has(key)) {
           for (const offer of hidden) {
             container.append(buildFn(offer));
           }
-        };
-        wrap.append(btn);
-        // In Grid-Ansicht: Wrap über volle Breite strecken
-        wrap.style.gridColumn = "1 / -1";
-        container.append(wrap);
+        } else {
+          const wrap = el("div", { class: "more-btn-wrap" });
+          const btn  = el("button", { class: "btn-more" },
+            `${hidden.length} weitere Treffer anzeigen`);
+          btn.onclick = () => {
+            // Aufklapp-Zustand merken, damit er beim nächsten _render() erhalten bleibt
+            this._expandedGroups.add(key);
+            wrap.remove();
+            for (const offer of hidden) {
+              container.append(buildFn(offer));
+            }
+          };
+          wrap.append(btn);
+          // In Grid-Ansicht: Wrap über volle Breite strecken
+          wrap.style.gridColumn = "1 / -1";
+          container.append(wrap);
+        }
       }
     }
   }
@@ -796,14 +832,16 @@ class AngeboteCheckerCard extends HTMLElement {
 
     /* Body */
     const body = el("div", { class: "offer-body" });
-    const itemName = el("div", { class: "offer-item-name" }, offer.item ?? "");
+    const itemNameEl = el("div", { class: "offer-item-name" }, offer.item ?? "");
+    const scoreBadge = buildScoreBadge(offer);
+    if (scoreBadge) itemNameEl.append(scoreBadge);
     const desc     = el("div", { class: "offer-desc" }, offer.description ?? "");
     const footer   = el("div", { class: "offer-footer" });
     const price    = el("div", { class: "offer-price" }, offer.price ?? "—");
     const period   = el("div", { class: "offer-period" });
     period.innerHTML = `<span>${offer.valid_from ?? ""}</span><span>bis ${offer.valid_to ?? ""}</span>`;
     footer.append(price, period);
-    body.append(itemName, desc, footer);
+    body.append(itemNameEl, desc, footer);
 
     card.append(imgWrap, body);
     return card;
@@ -814,8 +852,11 @@ class AngeboteCheckerCard extends HTMLElement {
     row.style.cursor = "pointer";
     row.onclick = () => this._openLightbox(offer);
     const left = el("div", { class: "offer-row-left" });
+    const rowItemEl = el("div", { class: "offer-row-item" }, offer.item ?? "");
+    const rowScoreBadge = buildScoreBadge(offer);
+    if (rowScoreBadge) rowItemEl.append(rowScoreBadge);
     left.append(
-      el("div", { class: "offer-row-item" },     offer.item ?? ""),
+      rowItemEl,
       el("div", { class: "offer-row-desc" },     offer.description ?? ""),
       el("div", { class: "offer-row-retailer" }, offer.retailer ?? ""),
     );
