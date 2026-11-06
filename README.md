@@ -14,6 +14,7 @@ Eine HACS-kompatible Custom Integration, die deine HA-Einkaufslisten (Todo-Entit
 - 🔍 Lightbox: Produktbild oder Karte per Klick öffnen
 - ✏️ Artikel direkt aus der Karte mit Angebotsinformationen ergänzen (z. B. `Butter → Butter (Lidl 0,99 €)`)
 - ➡️ Artikel aus der Lightbox heraus auf eine andere Einkaufsliste verschieben
+- 🎯 Relevanz-Scoring: Die treffendsten Angebote erscheinen zuerst – schlechter passende Treffer hinter einem „Weitere anzeigen"-Button
 - ✅ Vollständiger Config Flow – keine `configuration.yaml`-Änderungen nötig
 
 ## Screenshots
@@ -73,6 +74,7 @@ default_view: grid
 | Karte/Zeile anklicken | Klick auf Kachel oder Listenzeile öffnet die Lightbox |
 | Artikel ergänzen | In der Lightbox: benennt den Todo-Eintrag um (fügt Händler + Preis hinzu) |
 | Liste verschieben | In der Lightbox: verschiebt den Artikel auf eine andere Todo-Liste |
+| Weitere anzeigen | Pro Artikel werden die 5 besten Treffer angezeigt; Rest hinter einem Button |
 
 ## Service
 
@@ -83,6 +85,11 @@ service: angebote_checker.refresh
 Löst sofort eine neue Suche aus (z. B. per Dashboard-Button).
 
 ## Changelog
+
+### v1.3.0
+- 🎯 Relevanz-Scoring: Angebote werden nach Übereinstimmung mit dem Suchbegriff bewertet und sortiert
+- 🔡 Wortgrenzen-Matching: „Milch" bewertet „Buttermilch" korrekt niedriger als „Milch 1,5% fettarm"
+- 👁️ Pro Artikel werden standardmäßig die 5 relevantesten Treffer angezeigt; weitere über „X weitere Treffer anzeigen"-Button
 
 ### v1.2.0
 - 🌍 Neu: Österreich-Support (marktguru.at, 4-stellige PLZ) – Land wird bei der Einrichtung und in den Optionen gewählt
