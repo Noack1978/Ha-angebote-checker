@@ -57,6 +57,7 @@ COUNTRIES: dict[str, dict] = {
             "Hit",
             "Combi",
             "Marktkauf",
+            "Handelshof",
             "Famila",
             "diska",
         ],

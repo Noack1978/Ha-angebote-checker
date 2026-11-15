@@ -17,6 +17,9 @@
           "todo_lists": "Einkaufslisten (mehrere wählbar)",
           "retailers": "Händler prüfen (leer = alle)",
           "scan_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "retailers": "Eigene Händler per Texteingabe ergänzen. Den genauen Namen findest du in der Marktguru-App unter Einstellungen -> Meine Händler oder in der Händlersuche, genau so wie er dort erscheint, z. B. Handelshof oder E center."
         }
       }
     },
@@ -47,6 +50,9 @@
           "todo_lists": "Einkaufslisten",
           "retailers": "Händler prüfen (leer = alle)",
           "scan_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "retailers": "Eigene Händler per Texteingabe ergänzen. Den genauen Namen findest du in der Marktguru-App unter Einstellungen -> Meine Händler oder in der Händlersuche, genau so wie er dort erscheint, z. B. Handelshof oder E center."
         }
       }
     },

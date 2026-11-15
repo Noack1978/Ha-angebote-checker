@@ -122,6 +122,7 @@ def _build_details_schema(
             options=retailer_options,
             multiple=True,
             mode=SelectSelectorMode.LIST,
+            custom_value=True,
         )
     )
     fields[
