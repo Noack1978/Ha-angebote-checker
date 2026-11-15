@@ -17,6 +17,9 @@
           "todo_lists": "Shopping lists (multiple allowed)",
           "retailers": "Retailers to check (empty = all)",
           "scan_interval": "Update interval (minutes)"
+        },
+        "data_description": {
+          "retailers": "Add custom retailers by typing their name. Find the exact name in the Marktguru app under Settings → My Retailers or via the retailer search – use it exactly as shown there, e.g. \"Handelshof\" or \"E center\"."
         }
       }
     },
@@ -47,6 +50,9 @@
           "todo_lists": "Shopping lists",
           "retailers": "Retailers to check (empty = all)",
           "scan_interval": "Update interval (minutes)"
+        },
+        "data_description": {
+          "retailers": "Add custom retailers by typing their name. Find the exact name in the Marktguru app under Settings → My Retailers or via the retailer search – use it exactly as shown there, e.g. \"Handelshof\" or \"E center\"."
         }
       }
     },
