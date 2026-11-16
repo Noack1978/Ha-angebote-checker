@@ -99,8 +99,8 @@ def _build_details_schema(
     """Step 2: zip code, todo lists, retailers (country-specific) and interval."""
     d = defaults or {}
     retailer_options: list[str] = get_country(country)["retailers"]
-    # Händler eines anderen Landes aus den Vorgaben entfernen
-    retailer_default = [r for r in d.get(CONF_RETAILERS, []) if r in retailer_options]
+    # Alle gespeicherten Händler übernehmen – auch manuell eingetragene (custom_value)
+    retailer_default = d.get(CONF_RETAILERS, [])
     # PLZ-Vorgabe nur übernehmen, wenn sie zum Land passt
     zip_default = d.get(CONF_ZIP_CODE, "")
     if zip_default and not _zip_valid(zip_default, country):
